@@ -2,8 +2,9 @@ import streamlit as st
 import xml.etree.ElementTree as ET
 import urllib.request
 import math
+import pandas as pd
 
-st.set_page_config(page_title="Matbaa ve Ambalaj Maliyet Sistemi", layout="wide")
+st.set_page_config(page_title="Matbaa ve Ambalaj Maliyet & Teklif Sistemi", layout="wide")
 
 # --- 1. TCMB ANLIK EFEKTİF SATIŞ KURLARINI ÇEKME ---
 @st.cache_data(ttl=3600)
@@ -29,23 +30,23 @@ def tcmb_kurlarini_getir():
 
 canli_usd, canli_eur = tcmb_kurlarini_getir()
 
-# --- 2. OTURUM DURUMU VE EXCEL PARAMETRELERİ ---
+# --- 2. OTURUM DURUMU VE EXCEL PARAMETRELERİ (TAM 37 PARAMETRE) ---
 if 'page' not in st.session_state:
     st.session_state.page = 'home'
 
 default_params = {
-    # 1. Kağıt Grubu (Ton Maliyetleri)
+    # 1. Kağıt Grubu (4 Parametre - Ton)
     'bristol': 825.0,     # USD / Ton
     'krome': 40000.0,     # TL / Ton
     'kuse': 850.0,        # EUR / Ton
     'hamur': 1200.0,      # USD / Ton
     
-    # 2. Baskı Grubu (Hazırlık + Tiraj)
+    # 2. Baskı Grubu (9 Parametre - Hazırlık & Tiraj)
     'b_3550_cmyk': 1800.0, 'b_3550_pantone': 900.0, 'b_3550_tiraj': 400.0,
     'b_5070_cmyk': 3500.0, 'b_5070_pantone': 1750.0, 'b_5070_tiraj': 800.0,
     'b_70100_cmyk': 5000.0, 'b_70100_pantone': 1750.0, 'b_70100_tiraj': 1400.0,
     
-    # 3. Yüzey İşlemleri ve Lak Grubu
+    # 3. Yüzey İşlemleri ve Lak Grubu (14 Parametre)
     'disp_5070': 1500.0, 'disp_5070_tiraj': 800.0,
     'disp_70100': 2000.0, 'disp_70100_tiraj': 1000.0,
     'mat_sel': 4.70, 'par_sel': 4.50,
@@ -54,7 +55,7 @@ default_params = {
     'kab_5070': 1600.0, 'kab_5070_tiraj': 1.6,
     'kab_70100': 1900.0, 'kab_70100_tiraj': 1.9,
     
-    # 4. Kesim ve Mücellit Grubu
+    # 4. Kesim ve Mücellit Grubu (10 Parametre)
     'kazanli': 1800.0, 'kazanli_tiraj': 0.75,
     'pedal': 2500.0, 'pedal_tiraj': 1.0,
     'bobst': 3000.0, 'bobst_tiraj': 1.5,
@@ -72,9 +73,10 @@ else:
 def go_home(): st.session_state.page = 'home'
 def go_params(): st.session_state.page = 'params'
 def go_calc(): st.session_state.page = 'calc'
+def go_teklif(): st.session_state.page = 'teklif'
 
 # --- 3. ÜST GEZİNTİ BİLGİSİ ---
-st.markdown("### 🖨️ MATBAAM PRO - Ambalaj & Matbaa Maliyet Sistemi")
+st.markdown("### 🖨️ MATBAAM PRO - Ambalaj & Matbaa Maliyet ve Teklif Sistemi")
 st.info(f"🏦 TCMB Anlık Efektif Satış Kurları — USD: ₺{canli_usd:.2f} | EUR: ₺{canli_eur:.2f}")
 st.markdown("---")
 
@@ -86,50 +88,93 @@ if st.session_state.page == 'home':
     with col2:
         st.markdown("<h2 style='text-align: center;'>Yönetim & Hesaplama Modülü</h2>", unsafe_allow_html=True)
         st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("1. Parametreler (Fiyat Listesi Yönetimi)", use_container_width=True):
+        if st.button("1. Parametreler (Fiyat Listesi Yönetimi - 37 Kalem)", use_container_width=True):
             go_params()
             st.rerun()
         st.markdown("<br>", unsafe_allow_html=True)
         if st.button("2. Fiyat Çıkart (Maliyet Hesaplama Formu)", use_container_width=True):
             go_calc()
             st.rerun()
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("3. 📄 Müşteri Fiyat Teklifi Mektubu ve Tablosu", use_container_width=True):
+            go_teklif()
+            st.rerun()
 
 # ==========================================
-# MENÜ 2: PARAMETRELER SAYFASI (EXCEL VERİLERİ)
+# MENÜ 2: PARAMETRELER SAYFASI (EKSİKSİZ 37 PARAMETRE)
 # ==========================================
 elif st.session_state.page == 'params':
     if st.button("⬅️ Ana Menüye Dön"):
         go_home()
         st.rerun()
         
-    st.subheader("Matbaa Maliyet Parametreleri Fiyat Listesi (Orijinal Excel Verileri)")
+    st.subheader("Matbaa Maliyet Parametreleri Fiyat Listesi (Excel 37 Parametre Tam Listesi)")
+    st.caption("Excel dökümanındaki tüm kategoriler eksiksiz olarak buraya aktarılmıştır.")
     
     col1, col2 = st.columns(2)
     with col1:
-        st.markdown("#### 1. Kağıt ve Karton Grubu (Ton)")
+        st.markdown("#### 1. Kağıt ve Karton Grubu (Ton Maliyetleri)")
         st.session_state.params['bristol'] = st.number_input("Amerikan Bristol Ton ($ USD)", value=st.session_state.params['bristol'], key="p_bris")
         st.session_state.params['krome'] = st.number_input("Krome Karton Ton (TL)", value=st.session_state.params['krome'], key="p_krom")
         st.session_state.params['kuse'] = st.number_input("Kuşe Ton (€ EUR)", value=st.session_state.params['kuse'], key="p_kus")
         st.session_state.params['hamur'] = st.number_input("1. Hamur Ton ($ USD)", value=st.session_state.params['hamur'], key="p_ham")
         
-        st.markdown("#### 3. Yüzey İşlemleri ve Lak Grubu")
-        st.session_state.params['disp_5070'] = st.number_input("50x70 Dispresiyon Lak (Hazırlık)", value=st.session_state.params['disp_5070'], key="p_d50")
-        st.session_state.params['mat_sel'] = st.number_input("Mat Selofan M2 (₺)", value=st.session_state.params['mat_sel'], key="p_msel")
-        st.session_state.params['par_sel'] = st.number_input("Parlak Selofan M2 (₺)", value=st.session_state.params['par_sel'], key="p_psel")
-        st.session_state.params['lokal_5070'] = st.number_input("Lokal Lak 50x70 (Hazırlık)", value=st.session_state.params['lokal_5070'], key="p_l50")
-
-    with col2:
-        st.markdown("#### 2. Baskı Grubu")
+        st.markdown("---")
+        st.markdown("#### 2. Baskı Grubu (9 Parametre)")
+        st.markdown("##### 📐 35x50 Ebadı")
+        st.session_state.params['b_3550_cmyk'] = st.number_input("35x50 CMYK Hazırlık (₺)", value=st.session_state.params['b_3550_cmyk'], key="p_b35c")
+        st.session_state.params['b_3550_pantone'] = st.number_input("35x50 Pantone 1 Renk (₺)", value=st.session_state.params['b_3550_pantone'], key="p_b35p")
+        st.session_state.params['b_3550_tiraj'] = st.number_input("35x50 Tiraj (1.000 Adet/₺)", value=st.session_state.params['b_3550_tiraj'], key="p_b35t")
+        
+        st.markdown("##### 📐 50x70 Ebadı")
         st.session_state.params['b_5070_cmyk'] = st.number_input("50x70 CMYK Hazırlık (₺)", value=st.session_state.params['b_5070_cmyk'], key="p_b50c")
+        st.session_state.params['b_5070_pantone'] = st.number_input("50x70 Pantone 1 Renk (₺)", value=st.session_state.params['b_5070_pantone'], key="p_b50p")
         st.session_state.params['b_5070_tiraj'] = st.number_input("50x70 Tiraj (1.000 Adet/₺)", value=st.session_state.params['b_5070_tiraj'], key="p_b50t")
+        
+        st.markdown("##### 📐 70x100 Ebadı")
         st.session_state.params['b_70100_cmyk'] = st.number_input("70x100 CMYK Hazırlık (₺)", value=st.session_state.params['b_70100_cmyk'], key="p_b70c")
+        st.session_state.params['b_70100_pantone'] = st.number_input("70x100 Pantone 1 Renk (₺)", value=st.session_state.params['b_70100_pantone'], key="p_b70p")
         st.session_state.params['b_70100_tiraj'] = st.number_input("70x100 Tiraj (1.000 Adet/₺)", value=st.session_state.params['b_70100_tiraj'], key="p_b70t")
 
-        st.markdown("#### 4. Kesim ve Mücellit Grubu")
-        st.session_state.params['kazanli'] = st.number_input("Kazanlı Kesim (Hazırlık)", value=st.session_state.params['kazanli'], key="p_kaz")
-        st.session_state.params['pedal'] = st.number_input("Pedal Kesim (Hazırlık)", value=st.session_state.params['pedal'], key="p_ped")
-        st.session_state.params['bobst'] = st.number_input("Bobst Kesim (Hazırlık)", value=st.session_state.params['bobst'], key="p_bob")
-        st.session_state.params['omega_dip'] = st.number_input("Omega Dip Yapıştırma (Hazırlık)", value=st.session_state.params['omega_dip'], key="p_omd")
+    with col2:
+        st.markdown("#### 3. Yüzey İşlemleri ve Lak Grubu (14 Parametre)")
+        st.markdown("##### 🧪 Selofan M2 Fiyatları")
+        st.session_state.params['mat_sel'] = st.number_input("Mat Selofan M2 (₺)", value=st.session_state.params['mat_sel'], key="p_msel")
+        st.session_state.params['par_sel'] = st.number_input("Parlak Selofan M2 (₺)", value=st.session_state.params['par_sel'], key="p_psel")
+        
+        st.markdown("##### 🧪 Dispresiyon Lak")
+        st.session_state.params['disp_5070'] = st.number_input("50x70 Dispresiyon Lak Hazırlık (₺)", value=st.session_state.params['disp_5070'], key="p_d50")
+        st.session_state.params['disp_5070_tiraj'] = st.number_input("50x70 Dispresiyon Lak Tiraj (1.000 Adet/₺)", value=st.session_state.params['disp_5070_tiraj'], key="p_d50t")
+        st.session_state.params['disp_70100'] = st.number_input("70x100 Dispresiyon Lak Hazırlık (₺)", value=st.session_state.params['disp_70100'], key="p_d70")
+        st.session_state.params['disp_70100_tiraj'] = st.number_input("70x100 Dispresiyon Lak Tiraj (1.000 Adet/₺)", value=st.session_state.params['disp_70100_tiraj'], key="p_d70t")
+
+        st.markdown("##### 🧪 Lokal Lak (UV)")
+        st.session_state.params['lokal_5070'] = st.number_input("Lokal Lak 50x70 Hazırlık (₺)", value=st.session_state.params['lokal_5070'], key="p_l50")
+        st.session_state.params['lokal_5070_tiraj'] = st.number_input("Lokal Lak 50x70 Tiraj (Adet/₺)", value=st.session_state.params['lokal_5070_tiraj'], key="p_l50t")
+        st.session_state.params['lokal_70100'] = st.number_input("Lokal Lak 70x100 Hazırlık (₺)", value=st.session_state.params['lokal_70100'], key="p_l70")
+        st.session_state.params['lokal_70100_tiraj'] = st.number_input("Lokal Lak 70x100 Tiraj (Adet/₺)", value=st.session_state.params['lokal_70100_tiraj'], key="p_l70t")
+
+        st.markdown("##### 🧪 Kabartma Lak (3D)")
+        st.session_state.params['kab_5070'] = st.number_input("Kabartma Lak 50x70 Hazırlık (₺)", value=st.session_state.params['kab_5070'], key="p_k50")
+        st.session_state.params['kab_5070_tiraj'] = st.number_input("Kabartma Lak 50x70 Tiraj (Adet/₺)", value=st.session_state.params['kab_5070_tiraj'], key="p_k50t")
+        st.session_state.params['kab_70100'] = st.number_input("Kabartma Lak 70x100 Hazırlık (₺)", value=st.session_state.params['kab_70100'], key="p_k70")
+        st.session_state.params['kab_70100_tiraj'] = st.number_input("Kabartma Lak 70x100 Tiraj (Adet/₺)", value=st.session_state.params['kab_70100_tiraj'], key="p_k70t")
+
+        st.markdown("---")
+        st.markdown("#### 4. Kesim ve Mücellit Grubu (10 Parametre)")
+        st.markdown("##### ✂️ Kesim Makineleri")
+        st.session_state.params['kazanli'] = st.number_input("Kazanlı Kesim Hazırlık (₺)", value=st.session_state.params['kazanli'], key="p_kaz")
+        st.session_state.params['kazanli_tiraj'] = st.number_input("Kazanlı Kesim Tiraj (Adet/₺)", value=st.session_state.params['kazanli_tiraj'], key="p_kazt")
+        st.session_state.params['pedal'] = st.number_input("Pedal Kesim Hazırlık (₺)", value=st.session_state.params['pedal'], key="p_ped")
+        st.session_state.params['pedal_tiraj'] = st.number_input("Pedal Kesim Tiraj (Adet/₺)", value=st.session_state.params['pedal_tiraj'], key="p_pedt")
+        st.session_state.params['bobst'] = st.number_input("Bobst Otomatik Kesim Hazırlık (₺)", value=st.session_state.params['bobst'], key="p_bob")
+        st.session_state.params['bobst_tiraj'] = st.number_input("Bobst Kesim Tiraj (Adet/₺)", value=st.session_state.params['bobst_tiraj'], key="p_bobt")
+
+        st.markdown("##### 📦 Otomatik Yapıştırma")
+        st.session_state.params['omega_tek'] = st.number_input("Omega Tek Kulak Yapıştırma Hazırlık (₺)", value=st.session_state.params['omega_tek'], key="p_omt")
+        st.session_state.params['omega_tek_tiraj'] = st.number_input("Omega Tek Kulak Tiraj (Adet/₺)", value=st.session_state.params['omega_tek_tiraj'], key="p_omtt")
+        st.session_state.params['omega_dip'] = st.number_input("Omega Dip Yapıştırma Hazırlık (₺)", value=st.session_state.params['omega_dip'], key="p_omd")
+        st.session_state.params['omega_dip_tiraj'] = st.number_input("Omega Dip Yapıştırma Tiraj (Adet/₺)", value=st.session_state.params['omega_dip_tiraj'], key="p_omdt")
 
 # ==========================================
 # MENÜ 3: FORM VE HESAPLAMA MODÜLÜ
@@ -139,7 +184,6 @@ elif st.session_state.page == 'calc':
         go_home()
         st.rerun()
 
-    # --- MATBAA HESAPLAMA MOTORU ---
     def hesapla_maliyet_detayli(
         net_adet, gramaj, kagit_cinsi, baski_yuzu, pantone_sayisi, 
         laminasyon, ozel_baski, baski_sonrasi, basilacak_ebat, 
@@ -147,11 +191,6 @@ elif st.session_state.page == 'calc':
     ):
         params = st.session_state.params
         
-        # 1. Fire Hesaplama Algoritması (Excel Planlama Kuralı)
-        # Net Adet <= 1000 -> Min 100 Tabaka (%10)
-        # 1000 < Net Adet <= 1500 -> %10
-        # 1500 < Net Adet <= 3000 -> %7
-        # Net Adet > 3000 -> %5
         if fire_orani_override > 0:
             fire_pct = fire_orani_override
         else:
@@ -164,9 +203,6 @@ elif st.session_state.page == 'calc':
 
         brut_adet = int(math.ceil(net_adet * (1 + (fire_pct / 100.0))))
         
-        # 2. Tabaka Ebadı ve Montaj Hesabı
-        # Kuşe & 1. Hamur: Sabit (57x82, 64x90, 70x100)
-        # Bristol & Krome: <600kg 70x100; >=600kg özel imalat
         if "70x100" in basilacak_ebat:
             tab_en, tab_boy = 0.70, 1.00
             ebat_kodu = "70100"
@@ -186,7 +222,6 @@ elif st.session_state.page == 'calc':
             tab_en, tab_boy = 0.70, 1.00
             ebat_kodu = "70100"
 
-        # Ürün Boyutlarına Göre Montaj Hesabı (2D veya Kutu)
         en_m = ebat_en / 1000.0
         boy_m = ebat_boy / 1000.0
         fit_h = math.floor((tab_en - 0.02) / (en_m + 0.005)) * math.floor((tab_boy - 0.02) / (boy_m + 0.005))
@@ -197,11 +232,9 @@ elif st.session_state.page == 'calc':
         if tabaka_adeti < 100:
             tabaka_adeti = 100
 
-        # Toplam M2 ve Kağıt Ağırlığı (Kg)
         toplam_m2 = round(tabaka_adeti * tab_en * tab_boy, 2)
         kg_kagit = round((toplam_m2 * gramaj) / 1000.0, 2)
 
-        # 3. Kağıt Ton Maliyeti ve Kur Çevrimi
         if kagit_cinsi == "Amerikan Bristol":
             ton_fiyat_tl = params['bristol'] * canli_usd
         elif kagit_cinsi == "Krome Karton":
@@ -215,9 +248,6 @@ elif st.session_state.page == 'calc':
 
         kagit_maliyeti = (kg_kagit / 1000.0) * ton_fiyat_tl
 
-        # 4. Baskı ve Revolta Kontrolü (Excel Kuralı)
-        # Kuşe & 1. Hamur -> Revolta yapılabilir
-        # Bristol & Krome -> Revolta UYGULANAMAZ
         revolta_uygun = kagit_cinsi in ["Kuşe Kağıt", "1. Hamur Kağıt"]
         
         b_cmyk_base = params.get(f"b_{ebat_kodu}_cmyk", 3500.0)
@@ -246,7 +276,6 @@ elif st.session_state.page == 'calc':
             elif "4" in pantone_sayisi: renk_katsayi = 4
             baski_maliyeti += b_pantone_base * renk_katsayi
 
-        # 5. Yüzey İşlemleri, Lak ve Özel Baskılar
         selofan_maliyeti = 0.0
         if laminasyon == "Mat Selofan":
             selofan_maliyeti = toplam_m2 * params['mat_sel']
@@ -273,4 +302,293 @@ elif st.session_state.page == 'calc':
 
         yuzey_lak_toplam = selofan_maliyeti + ozel_baski_maliyeti
 
-        #
+        kesim_maliyeti = 0.0
+        if baski_sonrasi == "Düz Kesim":
+            kesim_maliyeti = 400.0
+        elif baski_sonrasi == "Özel Kesim":
+            kesim_maliyeti = params['bobst'] + max(0, net_adet - 1000) * params['bobst_tiraj']
+        elif baski_sonrasi == "Yan Yapıştırmalı Kutu":
+            kesim_maliyeti = (params['kazanli'] + max(0, net_adet - 1000) * params['kazanli_tiraj']) + (params['omega_tek'] + max(0, net_adet - 10000) * params['omega_tek_tiraj'])
+        elif baski_sonrasi in ["Dip Yapıştırmalı Kutu", "Kutu Kesim + Yapıştırma"]:
+            kesim_maliyeti = (params['kazanli'] + max(0, net_adet - 1000) * params['kazanli_tiraj']) + (params['omega_dip'] + max(0, net_adet - 10000) * params['omega_dip_tiraj'])
+        elif baski_sonrasi == "Özel Kesim+Düz Kesim":
+            kesim_maliyeti = (params['bobst'] + max(0, net_adet - 1000) * params['bobst_tiraj']) + 400.0
+        elif baski_sonrasi == "Pencereli Kutu Kesim+Yapıştırma":
+            base_k = (params['kazanli'] + max(0, net_adet - 1000) * params['kazanli_tiraj']) + (params['omega_dip'] + max(0, net_adet - 10000) * params['omega_dip_tiraj'])
+            kesim_maliyeti = base_k * 1.35
+
+        toplam_uretim_maliyeti = kagit_maliyeti + baski_maliyeti + yuzey_lak_toplam + kesim_maliyeti
+
+        return {
+            "brut_adet": brut_adet,
+            "fire_pct": fire_pct,
+            "montaj_adedi": montaj_adedi,
+            "tabaka_adeti": tabaka_adeti,
+            "toplam_m2": toplam_m2,
+            "kg_kagit": kg_kagit,
+            "kagit_maliyeti": kagit_maliyeti,
+            "baski_maliyeti": baski_maliyeti,
+            "selofan_maliyeti": selofan_maliyeti,
+            "ozel_baski_maliyeti": ozel_baski_maliyeti,
+            "yuzey_lak_toplam": yuzey_lak_toplam,
+            "kesim_maliyeti": kesim_maliyeti,
+            "toplam_uretim_maliyeti": toplam_uretim_maliyeti,
+            "revolta_uygun": revolta_uygun
+        }
+
+    st.subheader("📋 Matbaa Teklif & Maliyet Hesaplama Formu")
+    st.markdown("---")
+
+    st.markdown("##### 1. Ürün ve Kağıt Bilgileri")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        firma_adi = st.text_input("Firma Adı", "Erhan Ticaret")
+        urun_tipleri = ["Föy", "Tek Kırımlı Broşür", "İki Kırımlı Broşür", "Kartonet", "Yan Yapıştırmalı Kutu", "Dip Yapıştırmalı Kutu", "Sıvamalı Kutu", "Etiket", "Prospektüs"]
+        urun_tipi = st.selectbox("Ürün Tipi", urun_tipleri)
+    with col2:
+        urun_adi = st.text_input("Ürün Adı", "Lüks Ambalaj Kutusu")
+        kagit_cinsi = st.selectbox("Kağıt Cinsi", ["Amerikan Bristol", "Krome Karton", "Kuşe Kağıt", "1. Hamur Kağıt"])
+    with col3:
+        gramaj = st.number_input("Kağıt Gramajı (gr/m²)", value=300, step=10, min_value=50)
+        pantone_sayisi = st.selectbox("Baskı Pantone Renk Sayısı", ["Yok", "1 Renk Zemin", "2 Renk Zemin", "1 Renk Lokal", "2 Renk Lokal"])
+
+    st.markdown("---")
+
+    st.markdown("##### 2. Bitmiş Ebat ve Yüzey/Kesim İşlemleri")
+    ce1, ce2, ce3 = st.columns(3)
+    with ce1: ebat_en = st.number_input("En (mm)", value=200)
+    with ce2: ebat_boy = st.number_input("Boy (mm)", value=150)
+    with ce3: ebat_yukseklik = st.number_input("Yükseklik (mm)", value=50)
+
+    cl1, cl2, cl3 = st.columns(3)
+    with cl1:
+        laminasyon = st.selectbox("Laminasyon", ["Parlak Selofan", "Mat Selofan", "Dispresiyon Lak", "Yok"])
+    with cl2:
+        baski_sonrasi_secenekleri = ["Düz Kesim", "Özel Kesim", "Yan Yapıştırmalı Kutu", "Dip Yapıştırmalı Kutu", "Özel Kesim+Düz Kesim", "Pencereli Kutu Kesim+Yapıştırma"]
+        baski_sonrasi = st.selectbox("Baskı Sonrası Kesim/Mücellit", baski_sonrasi_secenekleri)
+    with cl3:
+        ozel_baski = st.selectbox("Özel İşlem (Lak/Gofre/Yaldız)", ["Yok", "Lokal Lak", "Kabartma Lak", "Gofre", "Varak Yaldız"])
+
+    st.markdown("---")
+
+    st.markdown("##### 3. Tiraj Seçenekleri ve Matbaa Planlama Kriterleri (3 Sütun)")
+    st.caption("Her adet alternatifi için ayrı ebat, montaj, revolta ve fire planlaması yapılır.")
+
+    ca, cb, cc = st.columns(3)
+
+    with ca:
+        st.markdown("#### 🔵 Alternatif A")
+        net_a = st.number_input("Net Adet A", value=1000, step=500, key="net_a")
+        plan_a = st.text_input("Plan A", "Standart Plan", key="plan_a")
+        fire_a = st.number_input("Fire Oranı (%) [0 = Otomatik]", value=0.0, step=0.5, key="fire_a")
+        ebat_a = st.selectbox("Basılacak Kağıdın Ebadı A", ["50x70 cm", "70x100 cm", "35x50 cm", "57x82 cm", "64x90 cm"], index=0, key="ebat_a")
+        baski_yuzu_a = st.selectbox("Baskı Adedi Ön ve Arka A", ["Tek Yüz Baskı", "Ön ve Arka Baskı", "Revolta Baskı"], key="baski_yuzu_a")
+        metod_a = st.selectbox("Baskı Metodu A", ["Tabaka Ofset", "Bobin Ofset"], key="metod_a")
+
+    with cb:
+        st.markdown("#### 🟢 Alternatif B")
+        net_b = st.number_input("Net Adet B", value=3000, step=500, key="net_b")
+        plan_b = st.text_input("Plan B", "Standart Plan", key="plan_b")
+        fire_b = st.number_input("Fire Oranı (%) [0 = Otomatik]", value=0.0, step=0.5, key="fire_b")
+        ebat_b = st.selectbox("Basılacak Kağıdın Ebadı B", ["50x70 cm", "70x100 cm", "35x50 cm", "57x82 cm", "64x90 cm"], index=1, key="ebat_b")
+        baski_yuzu_b = st.selectbox("Baskı Adedi Ön ve Arka B", ["Tek Yüz Baskı", "Ön ve Arka Baskı", "Revolta Baskı"], key="baski_yuzu_b")
+        metod_b = st.selectbox("Baskı Metodu B", ["Tabaka Ofset", "Bobin Ofset"], key="metod_b")
+
+    with cc:
+        st.markdown("#### 🟠 Alternatif C")
+        net_c = st.number_input("Net Adet C", value=5000, step=500, key="net_c")
+        plan_c = st.text_input("Plan C", "Standart Plan", key="plan_c")
+        fire_c = st.number_input("Fire Oranı (%) [0 = Otomatik]", value=0.0, step=0.5, key="fire_c")
+        ebat_c = st.selectbox("Basılacak Kağıdın Ebadı C", ["50x70 cm", "70x100 cm", "35x50 cm", "57x82 cm", "64x90 cm"], index=1, key="ebat_c")
+        baski_yuzu_c = st.selectbox("Baskı Adedi Ön ve Arka C", ["Tek Yüz Baskı", "Ön ve Arka Baskı", "Revolta Baskı"], key="baski_yuzu_c")
+        metod_c = st.selectbox("Baskı Metodu C", ["Tabaka Ofset", "Bobin Ofset"], key="metod_c")
+
+    if kagit_cinsi in ["Amerikan Bristol", "Krome Karton"]:
+        st.warning("⚠️ **Matbaa Planlama Uyarısı:** Amerikan Bristol ve Krome Karton kağıtların ön ve arka yüzey nitelikleri farklı olduğundan Revolta baskı metodu UYGULANAMAZ. Ön ve arka yüzeyler ayrı kalıplarla hesaplanacaktır.")
+
+    st.markdown("---")
+    kar_orani = st.slider("Hedef Kar Marjı (%)", 0, 100, 30)
+
+    # FINANSAL HESAPLAMA
+    res_a = hesapla_maliyet_detayli(net_a, gramaj, kagit_cinsi, baski_yuzu_a, pantone_sayisi, laminasyon, ozel_baski, baski_sonrasi, ebat_a, fire_a, ebat_en, ebat_boy, ebat_yukseklik)
+    res_b = hesapla_maliyet_detayli(net_b, gramaj, kagit_cinsi, baski_yuzu_b, pantone_sayisi, laminasyon, ozel_baski, baski_sonrasi, ebat_b, fire_b, ebat_en, ebat_boy, ebat_yukseklik)
+    res_c = hesapla_maliyet_detayli(net_c, gramaj, kagit_cinsi, baski_yuzu_c, pantone_sayisi, laminasyon, ozel_baski, baski_sonrasi, ebat_c, fire_c, ebat_en, ebat_boy, ebat_yukseklik)
+
+    # TEKLİF SAYFASI İÇİN OTURUM AKTARIMI (Session Storage)
+    st.session_state.teklif_data = {
+        "firma_adi": firma_adi,
+        "urun_adi": urun_adi,
+        "urun_tipi": urun_tipi,
+        "kagit_cinsi": kagit_cinsi,
+        "gramaj": gramaj,
+        "ebat_en": ebat_en,
+        "ebat_boy": ebat_boy,
+        "ebat_yukseklik": ebat_yukseklik,
+        "laminasyon": laminasyon,
+        "baski_sonrasi": baski_sonrasi,
+        "ozel_baski": ozel_baski,
+        "pantone_sayisi": pantone_sayisi,
+        "kar_orani": kar_orani,
+        "alternatifler": [
+            {"kod": "A", "net_adet": net_a, "ebat": ebat_a, "res": res_a},
+            {"kod": "B", "net_adet": net_b, "ebat": ebat_b, "res": res_b},
+            {"kod": "C", "net_adet": net_c, "ebat": ebat_c, "res": res_c}
+        ]
+    }
+
+    st.markdown("### 📊 Üretim Planlaması, Maliyetler ve Karlı Satış Fiyatları")
+
+    tab_a, tab_b, tab_c = st.tabs([f"A: {net_a:,} Adet", f"B: {net_b:,} Adet", f"C: {net_c:,} Adet"])
+
+    def sonuclari_yazdir(net_kullanici_adeti, r):
+        net_uretim_maliyeti = r['toplam_uretim_maliyeti']
+        kar_tutari = net_uretim_maliyeti * (kar_orani / 100.0)
+        karli_toplam_satis = net_uretim_maliyeti + kar_tutari
+        
+        birim_maliyet = net_uretim_maliyeti / net_kullanici_adeti if net_kullanici_adeti > 0 else 0
+        karli_birim_satis = karli_toplam_satis / net_kullanici_adeti if net_kullanici_adeti > 0 else 0
+
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("Brüt Adet (Fireli)", f"{r['brut_adet']:,} adet", delta=f"%{r['fire_pct']:.1f} Fire")
+        m2.metric("Tabaka Adedi", f"{r['tabaka_adeti']:,} tabaka")
+        m3.metric("Kağıt Kilogram", f"{r['kg_kagit']} kg")
+        m4.metric("Toplam Alan (Kaç M²)", f"{r['toplam_m2']:,.2f} m²")
+
+        st.markdown("##### Maliyet Kalemleri Dökümü")
+        f1, f2, f3, f4 = st.columns(4)
+        f1.metric("Kağıt Maliyeti", f"₺{r['kagit_maliyeti']:,.2f}")
+        f2.metric("Baskı Maliyeti", f"₺{r['baski_maliyeti']:,.2f}")
+        f3.metric("Yüzey & Lak Maliyeti", f"₺{r['yuzey_lak_toplam']:,.2f}")
+        f4.metric("Kesim & Mücellit", f"₺{r['kesim_maliyeti']:,.2f}")
+
+        st.markdown("##### Genel Finansal Özet")
+        o1, o2, o3 = st.columns(3)
+        o1.metric("Toplam Üretim Maliyeti", f"₺{net_uretim_maliyeti:,.2f}")
+        o2.metric("Net Kar Tutarı", f"₺{kar_tutari:,.2f}")
+        o3.metric("Karlı Toplam Satış Fiyatı", f"₺{karli_toplam_satis:,.2f}")
+
+        st.success(f"📌 **Birim Üretim Maliyeti:** ₺{birim_maliyet:,.4f} &nbsp;&nbsp;|&nbsp;&nbsp; 💰 **Karlı Birim Satış Fiyatı:** ₺{karli_birim_satis:,.4f}")
+
+    with tab_a: sonuclari_yazdir(net_a, res_a)
+    with tab_b: sonuclari_yazdir(net_b, res_b)
+    with tab_c: sonuclari_yazdir(net_c, res_c)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    if st.button("📄 Müşteri İçin Hazır Fiyat Teklif Sayfasına Git", use_container_width=True):
+        go_teklif()
+        st.rerun()
+
+# ==========================================
+# MENÜ 4: MÜŞTERİ FİYAT TEKLİF SAYFASI (TEKLİF DÖKÜMÜ VE MEKTUBU)
+# ==========================================
+elif st.session_state.page == 'teklif':
+    if st.button("⬅️ Ana Menüye Dön"):
+        go_home()
+        st.rerun()
+
+    st.subheader("📄 Müşteri Fiyat Teklifi ve Ürün Şartnamesi")
+    
+    if 'teklif_data' not in st.session_state or not st.session_state.teklif_data:
+        st.warning("⚠️ Henüz bir hesaplama yapılmadı. Lütfen önce 'Fiyat Çıkart' modülünden ürün hesaplamasını gerçekleştirin.")
+        if st.button("Forma Dön ve Hesapla"):
+            go_calc()
+            st.rerun()
+    else:
+        td = st.session_state.teklif_data
+        kar_orani = td['kar_orani']
+
+        st.markdown("<div style='background-color: #f8f9fa; padding: 20px; border-radius: 10px; border-left: 5px solid #1F4E78;'>"
+                    "<h3 style='margin: 0; color: #1F4E78;'>OFFICIAL PRICE QUOTATION / FİYAT TEKLİF MEKTUBU</h3>"
+                    f"<p style='margin: 5px 0 0 0;'><strong>Sayın:</strong> {td['firma_adi']}</p>"
+                    "<p style='margin: 2px 0 0 0;'><strong>Tarih:</strong> 03 Kasım 2026 | <strong>Teklif No:</strong> OFF-2026-8492</p>"
+                    "</div>", unsafe_allow_html=True)
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("#### 1. Ürün & İmalat Teknik Özellikleri")
+        
+        col_t1, col_t2, col_t3 = st.columns(3)
+        with col_t1:
+            st.write(f"**Ürün Adı:** {td['urun_adi']}")
+            st.write(f"**Ürün Tipi:** {td['urun_tipi']}")
+            st.write(f"**Ebat:** {td['ebat_en']} mm x {td['ebat_boy']} mm x {td['ebat_yukseklik']} mm")
+        with col_t2:
+            st.write(f"**Kağıt Cinsi:** {td['kagit_cinsi']}")
+            st.write(f"**Gramaj:** {td['gramaj']} gr/m²")
+            st.write(f"**Pantone Renk:** {td['pantone_sayisi']}")
+        with col_t3:
+            st.write(f"**Yüzey Kaplama:** {td['laminasyon']}")
+            st.write(f"**Özel İşlem:** {td['ozel_baski']}")
+            st.write(f"**Kesim/Mücellit:** {td['baski_sonrasi']}")
+
+        st.markdown("---")
+        st.markdown("#### 2. Adet Alternatiflerine Göre Fiyat Tablosu")
+
+        table_rows = []
+        for alt in td['alternatifler']:
+            res = alt['res']
+            net_adet = alt['net_adet']
+            net_maliyet = res['toplam_uretim_maliyeti']
+            kar_tutari = net_maliyet * (kar_orani / 100.0)
+            toplam_satis_tl = net_maliyet + kar_tutari
+            birim_satis_tl = toplam_satis_tl / net_adet if net_adet > 0 else 0
+            
+            toplam_satis_usd = toplam_satis_tl / canli_usd
+            toplam_satis_eur = toplam_satis_tl / canli_eur
+            birim_satis_usd = birim_satis_tl / canli_usd
+
+            table_rows.append({
+                "Alternatif": f"Option {alt['kod']}",
+                "Net Adet": f"{net_adet:,} adet",
+                "Tabaka Ebadı": alt['ebat'],
+                "Kağıt Ağırlığı": f"{res['kg_kagit']} kg",
+                "Birim Satış Fiyatı (TL)": f"₺{birim_satis_tl:,.4f}",
+                "Birim Satış ($ USD)": f"${birim_satis_usd:,.4f}",
+                "Karlı Toplam Tutar (TL)": f"₺{toplam_satis_tl:,.2f}",
+                "Karlı Toplam ($ USD)": f"${toplam_satis_usd:,.2f}",
+                "Karlı Toplam (€ EUR)": f"€{toplam_satis_eur:,.2f}"
+            })
+
+        df_teklif = pd.DataFrame(table_rows)
+        st.dataframe(df_teklif, use_container_width=True, hide_index=True)
+
+        st.markdown("---")
+        st.markdown("#### 3. Hazır Teklif Mektubu Metni (Kopyalanabilir)")
+        
+        letter_lines = [
+            f"SAYIN {td['firma_adi'].upper()},",
+            "",
+            f"Talep etmiş olduğunuz '{td['urun_adi']}' ambalaj/matbaa işine ait teknik imalat ve fiyat teklifimiz aşağıda bilginize sunulmuştur.",
+            "",
+            "ÜRÜN TEKNİK ŞARTNAMESİ:",
+            f"• Ürün Tipi / Adı: {td['urun_tipi']} / {td['urun_adi']}",
+            f"• Ebat: {td['ebat_en']} mm x {td['ebat_boy']} mm x {td['ebat_yukseklik']} mm",
+            f"• Malzeme Bilgisi: {td['gramaj']} gr/m² {td['kagit_cinsi']}",
+            f"• Yüzey Kaplama: {td['laminasyon']} | Özel İşlem: {td['ozel_baski']}",
+            f"• Baskı Sonrası: {td['baski_sonrasi']}",
+            "",
+            "FİYAT VE ADET SEÇENEKLERİ:"
+        ]
+        
+        for alt in td['alternatifler']:
+            res = alt['res']
+            net_adet = alt['net_adet']
+            net_maliyet = res['toplam_uretim_maliyeti']
+            kar_tutari = net_maliyet * (kar_orani / 100.0)
+            toplam_satis_tl = net_maliyet + kar_tutari
+            birim_satis_tl = toplam_satis_tl / net_adet if net_adet > 0 else 0
+            letter_lines.append(f"- {net_adet:,} Adet için: Birim Fiyat: ₺{birim_satis_tl:,.4f} + KDV | Toplam Tutar: ₺{toplam_satis_tl:,.2f} + KDV")
+
+        letter_lines.extend([
+            "",
+            "GENEL ŞARTLAR:",
+            "1. Teklifimiz 15 (on beş) gün süreyle geçerlidir.",
+            "2. Fiyatlarımıza KDV dahil değildir.",
+            "3. Teslimat süresi onaylanan grafik baskı onayı sonrası 7-10 iş günüdür.",
+            "",
+            "Bilgilerinize arz eder, hayırlı işler dileriz.",
+            "Saygılarımızla,",
+            "Matbaa & Ambalaj Üretim Yönetimi"
+        ])
+
+        letter_text = "\n".join(letter_lines)
+        st.text_area("Yazışmalarınız için Teklif Mektubu", value=letter_text, height=350)
