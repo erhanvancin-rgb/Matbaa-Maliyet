@@ -120,7 +120,7 @@ elif st.session_state.page == 'calc':
     st.subheader("📋 Ürün Bilgileri ve Maliyet Hesaplama Formu")
     st.markdown("---")
 
-    # 1. Firma ve Ürün Genel Bilgileri
+    # 1. Firma og Ürün Genel Bilgileri
     col1, col2 = st.columns(2)
     with col1:
         firma_adi = st.text_input("Firma Adı", "Erhan Ticaret", key="form_firma")
@@ -189,10 +189,18 @@ elif st.session_state.page == 'calc':
     st.markdown("---")
 
     # 7. Laminasyon, Baskı Sonrası (Solda) ve Özel Baskılar (Sağda)
+    baski_sonrasi_secenekleri = [
+        "Düz Kesim", 
+        "Özel Kesim", 
+        "Kutu Kesim + Yapıştırma", 
+        "Özel Kesim+Düz Kesim", 
+        "Pencereli Kutu Kesim+Yapıştırma"
+    ]
+
     col_l1, col_l2 = st.columns(2)
     with col_l1:
         laminasyon = st.selectbox("Laminasyon", ["Parlak Selofan", "Mat Selofan", "Dispresiyon Lak", "Yok"], key="form_laminasyon")
-        baski_sonrasi = st.selectbox("Baskı Sonrası", ["Düz Kesim", "Özel Kesim", "Kutu Kesim + Yapıştırma"], key="form_baski_sonrasi")
+        baski_sonrasi = st.selectbox("Baskı Sonrası", baski_sonrasi_secenekleri, key="form_baski_sonrasi")
     with col_l2:
         ozel_baski_1 = st.selectbox("Özel Baskılar 1", ["Yok", "Lokal Lak", "Kabartma Lak", "Gofre", "Varak Yaldız"], key="form_ozel_baski_1")
         ozel_baski_2 = st.selectbox("Özel Baskılar 2", ["Yok", "Lokal Lak", "Kabartma Lak", "Gofre", "Varak Yaldız"], key="form_ozel_baski_2")
@@ -237,8 +245,14 @@ elif st.session_state.page == 'calc':
     elif laminasyon == "Dispresiyon Lak": selofan_maliyeti = params['disp_5070'] + (adet_a * params['disp_5070_tiraj'] / 1000)
 
     kesim_maliyeti = 0
-    if baski_sonrasi == "Özel Kesim": kesim_maliyeti = params['bobst'] + (adet_a * params['bobst_tiraj'])
-    elif baski_sonrasi == "Kutu Kesim + Yapıştırma": kesim_maliyeti = params['kazanli'] + (adet_a * params['kazanli_tiraj']) + params['omega_dip'] + (adet_a * params['omega_dip_tiraj'])
+    if baski_sonrasi == "Özel Kesim":
+        kesim_maliyeti = params['bobst'] + (adet_a * params['bobst_tiraj'])
+    elif baski_sonrasi == "Kutu Kesim + Yapıştırma":
+        kesim_maliyeti = params['kazanli'] + (adet_a * params['kazanli_tiraj']) + params['omega_dip'] + (adet_a * params['omega_dip_tiraj'])
+    elif baski_sonrasi == "Özel Kesim+Düz Kesim":
+        kesim_maliyeti = (params['bobst'] + (adet_a * params['bobst_tiraj'])) * 1.3
+    elif baski_sonrasi == "Pencereli Kutu Kesim+Yapıştırma":
+        kesim_maliyeti = (params['kazanli'] + (adet_a * params['kazanli_tiraj']) + params['omega_dip'] + (adet_a * params['omega_dip_tiraj'])) * 1.4
 
     toplam_maliyet = kagit_maliyeti + baski_maliyeti + selofan_maliyeti + kesim_maliyeti
     net_kar = toplam_maliyet * (kar_orani / 100)
