@@ -208,7 +208,7 @@ elif st.session_state.page == 'calc':
 
     st.markdown("---")
 
-    # --- BÖLÜM 3: 3'LÜ ADET VE MATBAA PLANLAMA (TAM GÖRSELİNİZDEKİ GİBİ SIRALI) ---
+    # --- BÖLÜM 3: 3'LÜ ADET VE MATBAA PLANLAMA ---
     st.markdown("##### 3. Tiraj Seçenekleri ve Matbaa Planlama Kriterleri")
     st.caption("Her adet için ayrı ebat, montaj ve fire planlaması yapabilirsiniz.")
     
@@ -221,4 +221,62 @@ elif st.session_state.page == 'calc':
         plan_a = st.text_input("Plan", "Standart", key="a_plan")
         fire_a = st.number_input("Fire Oranı (%)", value=5.0, step=0.5, key="a_fire")
         montaj_a = st.selectbox("Montaj Planı", ["Forma (Tek Yüz)", "Karşılıklı Forma", "Özel Yerleşim"], key="a_mon")
-        ebat_a =
+        ebat_a = st.selectbox("Basılacak Kağıdın Ebadı", ["35x50 cm", "50x70 cm", "70x100 cm"], index=1, key="a_ebat")
+        onarka_a = st.selectbox("Baskı Adedi Ön ve Arka", ["Tek Yüz Baskı", "Ön ve Arka Baskı", "Baskı Yok"], key="a_onarka")
+        metod_a = st.selectbox("Baskı Metodu", ["Tabaka Ofset", "Bobin Ofset"], key="a_metod")
+
+    # Sütun B
+    with col_b:
+        st.markdown("#### 🟢 Alternatif B")
+        adet_b = st.number_input("Net Adet", value=3000, step=500, key="b_adet")
+        plan_b = st.text_input("Plan", "Standart", key="b_plan")
+        fire_b = st.number_input("Fire Oranı (%)", value=4.5, step=0.5, key="b_fire")
+        montaj_b = st.selectbox("Montaj Planı", ["Forma (Tek Yüz)", "Karşılıklı Forma", "Özel Yerleşim"], key="b_mon")
+        ebat_b = st.selectbox("Basılacak Kağıdın Ebadı", ["35x50 cm", "50x70 cm", "70x100 cm"], index=1, key="b_ebat")
+        onarka_b = st.selectbox("Baskı Adedi Ön ve Arka", ["Tek Yüz Baskı", "Ön ve Arka Baskı", "Baskı Yok"], key="b_onarka")
+        metod_b = st.selectbox("Baskı Metodu", ["Tabaka Ofset", "Bobin Ofset"], key="b_metod")
+
+    # Sütun C
+    with col_c:
+        st.markdown("#### 🟠 Alternatif C")
+        adet_c = st.number_input("Net Adet", value=5000, step=500, key="c_adet")
+        plan_c = st.text_input("Plan", "Standart", key="c_plan")
+        fire_c = st.number_input("Fire Oranı (%)", value=4.0, step=0.5, key="c_fire")
+        montaj_c = st.selectbox("Montaj Planı", ["Forma (Tek Yüz)", "Karşılıklı Forma", "Özel Yerleşim"], key="c_mon")
+        ebat_c = st.selectbox("Basılacak Kağıdın Ebadı", ["35x50 cm", "50x70 cm", "70x100 cm"], index=2, key="c_ebat")
+        onarka_c = st.selectbox("Baskı Adedi Ön ve Arka", ["Tek Yüz Baskı", "Ön ve Arka Baskı", "Baskı Yok"], key="c_onarka")
+        metod_c = st.selectbox("Baskı Metodu", ["Tabaka Ofset", "Bobin Ofset"], key="c_metod")
+
+    st.markdown("---")
+    kar_orani = st.slider("Hedef Kar Marjı (%)", 0, 100, 30)
+
+    # --- HESAPLAMA VE SONUÇLAR ---
+    st.markdown("### 📊 Sonuçlar: Brüt Adet, Kağıt Kilogram ve Finansal Döküm")
+
+    res_a = hesapla_maliyet(adet_a, gramaj, kagit_cinsi, onarka_a, laminasyon, baski_sonrasi, ebat_a, fire_a, ebat_en, ebat_boy)
+    res_b = hesapla_maliyet(adet_b, gramaj, kagit_cinsi, onarka_b, laminasyon, baski_sonrasi, ebat_b, fire_b, ebat_en, ebat_boy)
+    res_c = hesapla_maliyet(adet_c, gramaj, kagit_cinsi, onarka_c, laminasyon, baski_sonrasi, ebat_c, fire_c, ebat_en, ebat_boy)
+
+    tab1, tab2, tab3 = st.tabs([f"A: {adet_a:,} Adet", f"B: {adet_b:,} Adet", f"C: {adet_c:,} Adet"])
+
+    def goster_sonuclar(adet, res):
+        kar = res[8] * (kar_orani / 100)
+        toplam_fiyat = res[8] + kar
+        
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Brüt Adet (Fireli)", f"{res[0]:,} adet")
+        c2.metric("Kağıt Kilogram", f"{res[3]} kg")
+        c3.metric("Kaç M2", f"{res[2]:,.2f} m²")
+        c4.metric("Tabaka Adedi", f"{res[1]:,} tabaka")
+        
+        f1, f2, f3, f4 = st.columns(4)
+        f1.metric("Kağıt Maliyeti", f"₺{res[4]:,.2f}")
+        f2.metric("Toplam Baskı Maliyeti", f"₺{res[5]:,.2f}")
+        f3.metric("Toplam Üretim Maliyeti", f"₺{res[8]:,.2f}")
+        f4.metric("Karlı Toplam Satış", f"₺{toplam_fiyat:,.2f}")
+        
+        st.info(f"**Birim Maliyet:** ₺{res[8]/adet:,.4f} &nbsp;&nbsp;|&nbsp;&nbsp; **Karlı Birim Satış Fiyatı:** ₺{toplam_fiyat/adet:,.4f}")
+
+    with tab1: goster_sonuclar(adet_a, res_a)
+    with tab2: goster_sonuclar(adet_b, res_b)
+    with tab3: goster_sonuclar(adet_c, res_c)
