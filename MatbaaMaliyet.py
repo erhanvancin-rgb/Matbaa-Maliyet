@@ -102,7 +102,7 @@ elif st.session_state.page == 'params':
         st.markdown("#### 3. Yüzey İşlemleri ve Lak Grubu")
         st.session_state.params['mat_sel'] = st.number_input("Mat Selofan M2 (TL)", value=st.session_state.params['mat_sel'])
         st.session_state.params['par_sel'] = st.number_input("Parlak Selofan M2 (TL)", value=st.session_state.params['par_sel'])
-        st.session_state.params['lokal_5070'] = st.number_input("Lokal Lak 50x70 (Tabaka)", value=st.session_state.params['lokal_5070'])
+        st.session_state.params['lokal_5070'] = st.number_input("Lokal Lak 50x70 (Tabaka)", value=st.session_state.params['lokal_5070'], key="input_lokal_5070")
         st.session_state.params['lokal_5070_tiraj'] = st.number_input("Lokal Lak 50x70 Tiraj (Adet)", value=st.session_state.params['lokal_5070_tiraj'])
         st.session_state.params['kab_5070'] = st.number_input("Kabartma Lak 50x70 (Tabaka)", value=st.session_state.params['kab_5070'])
 
