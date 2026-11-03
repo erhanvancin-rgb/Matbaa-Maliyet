@@ -148,20 +148,19 @@ elif st.session_state.page == 'calc':
 
     st.markdown("---")
 
-    # 4. Kağıt Gramajı ve Cinsi (Ana ve Alternatif B)
+    # 4. Kağıt Gramajı ve Cinsi (Manuel Gramaj Girişli)
     kagit_listesi = ["Amerikan Bristol", "Krome Karton", "Kuşe Kağıt", "1. Hamur Kağıt"]
-    gramaj_listesi = [200, 250, 300, 350, 400]
 
     st.markdown("##### 📄 Kağıt ve Malzeme Seçimi")
     col_k1, col_k2 = st.columns(2)
     with col_k1:
         st.markdown("**Kağıt Cinsi ve Gramajı (Ana)**")
         kagit_a = st.selectbox("Kağıt Cinsi A", kagit_listesi, key="form_kagit_a")
-        gramaj_a = st.selectbox("Gramaj A", gramaj_listesi, index=2, key="form_gramaj_a")
+        gramaj_a = st.number_input("Gramaj A (gr/m²)", value=300, step=10, min_value=50, key="form_gramaj_a")
     with col_k2:
         st.markdown("**Kağıt Cinsi ve Gramajı Alternatif B**")
         kagit_b = st.selectbox("Kağıt Cinsi B", kagit_listesi, key="form_kagit_b")
-        gramaj_b = st.selectbox("Gramaj B", gramaj_listesi, index=2, key="form_gramaj_b")
+        gramaj_b = st.number_input("Gramaj B (gr/m²)", value=350, step=10, min_value=50, key="form_gramaj_b")
 
     st.markdown("---")
 
@@ -189,14 +188,14 @@ elif st.session_state.page == 'calc':
 
     st.markdown("---")
 
-    # 7. Laminasyon ve Özel Baskılar
+    # 7. Laminasyon, Baskı Sonrası (Solda) ve Özel Baskılar (Sağda)
     col_l1, col_l2 = st.columns(2)
     with col_l1:
         laminasyon = st.selectbox("Laminasyon", ["Parlak Selofan", "Mat Selofan", "Dispresiyon Lak", "Yok"], key="form_laminasyon")
-        ozel_baski_1 = st.selectbox("Özel Baskılar 1", ["Yok", "Lokal Lak", "Kabartma Lak", "Gofre", "Varak Yaldız"], key="form_ozel_baski_1")
-    with col_l2:
-        ozel_baski_2 = st.selectbox("Özel Baskılar 2", ["Yok", "Lokal Lak", "Kabartma Lak", "Gofre", "Varak Yaldız"], key="form_ozel_baski_2")
         baski_sonrasi = st.selectbox("Baskı Sonrası", ["Düz Kesim", "Özel Kesim", "Kutu Kesim + Yapıştırma"], key="form_baski_sonrasi")
+    with col_l2:
+        ozel_baski_1 = st.selectbox("Özel Baskılar 1", ["Yok", "Lokal Lak", "Kabartma Lak", "Gofre", "Varak Yaldız"], key="form_ozel_baski_1")
+        ozel_baski_2 = st.selectbox("Özel Baskılar 2", ["Yok", "Lokal Lak", "Kabartma Lak", "Gofre", "Varak Yaldız"], key="form_ozel_baski_2")
 
     st.markdown("---")
 
