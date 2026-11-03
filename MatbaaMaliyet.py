@@ -1,23 +1,55 @@
 import streamlit as st
+import xml.etree.ElementTree as ET
+import urllib.request
 
 st.set_page_config(page_title="Matbaa ve Ambalaj Maliyet Sistemi", layout="wide")
+
+# --- TCMB'DEN ANLIK EFEKTİF SATIŞ KURLARINI ÇEKME FONKSİYONU ---
+@st.cache_data(ttl=3600) # Kurları 1 saat boyunca önbellekte tutar, her açılışta günceller
+def tcmb_kurlarini_getir():
+    usd_kur = 49.97  # Yedek varsayılan
+    eur_kur = 56.00  # Yedek varsayılan
+    try:
+        url = "https://www.tcmb.gov.tr/kurlar/today.xml"
+        req = urllib.request.urlopen(url, timeout=5)
+        xml_data = req.read()
+        root = ET.fromstring(xml_data)
+        
+        for currency in root.findall('Currency'):
+            code = currency.get('CurrencyCode')
+            # Efektif Satış (ForexSelling veya BanknoteSelling)
+            if code == 'USD':
+                val = currency.find('BanknoteSelling').text
+                if val: usd_kur = float(val)
+            elif code == 'EUR':
+                val = currency.find('BanknoteSelling').text
+                if val: eur_kur = float(val)
+    except Exception as e:
+        pass # Bağlantı sorunu olursa varsayılan yedek kurları kullanır
+    return usd_kur, eur_kur
+
+# Kurları al
+canli_usd, canli_eur = tcmb_kurlarini_getir()
 
 # Oturum Durumu (Modül Yönetimi)
 if 'page' not in st.session_state:
     st.session_state.page = 'home'
 
-def go_home():
-    st.session_state.page = 'home'
+if 'params' not in st.session_state:
+    st.session_state.params = {
+        'bristol': 825.0, 'krome': 40000.0, 'kuse': 850.0, 'hamur': 1200.0,
+        'b_5070_cmyk': 3500.0, 'b_5070_tiraj': 800.0, 'b_70100_cmyk': 5000.0, 'b_70100_tiraj': 1400.0,
+        'mat_sel': 4.70, 'par_sel': 4.50, 'lokal_lak': 1500.0, 'kab_lak': 1600.0,
+        'kazanli': 1800.0, 'kazanli_tiraj': 0.75, 'bobst': 3000.0, 'yap_tiraj': 0.25
+    }
 
-def go_params():
-    st.session_state.page = 'params'
+def go_home(): st.session_state.page = 'home'
+def go_params(): st.session_state.page = 'params'
+def go_calc(): st.session_state.page = 'calc'
 
-def go_calc():
-    st.session_state.page = 'calc'
-
-# Üst Başlık & Bilgi Çubuğu
+# Üst Bilgi ve TCMB Canlı Kur Göstergesi
 st.markdown("### 🖨️ MATBAAM PRO - Ambalaj & Matbaa Maliyet Sistemi")
-st.info("Güncel Kur: USD: ₺49.97 | EUR: ₺56.00 (Tarih: 28.01.2026)")
+st.info(f"🏦 TCMB Resmi Anlık Efektif Satış Kurları — USD: ₺{canli_usd:.2f} | EUR: ₺{canli_eur:.2f}")
 st.markdown("---")
 
 # 1. ANA SAYFA (Yalnızca 2 Buton)
@@ -44,21 +76,34 @@ elif st.session_state.page == 'params':
         go_home()
         st.rerun()
         
-    st.subheader("Parametre Fiyat Listesi Yönetimi")
+    st.subheader("Matbaa Maliyet Parametreleri Fiyat Listesi")
     
     col1, col2 = st.columns(2)
     with col1:
-        st.markdown("#### 1. Kağıt ve Karton Grubu (Ton)")
-        p_bristol = st.number_input("Amerikan Bristol Ton ($ USD)", value=825.0)
-        p_krome = st.number_input("Krome Karton Ton (TRY TL)", value=40000.0)
-        p_kuse = st.number_input("Kuşe Ton (€ EUR)", value=850.0)
-        p_hamur = st.number_input("1. Hamur Ton ($ USD)", value=1200.0)
+        st.markdown("#### 1. Kağıt ve Karton Grubu (Ton Maliyetleri)")
+        st.session_state.params['bristol'] = st.number_input("Amerikan Bristol Ton ($ USD)", value=st.session_state.params['bristol'])
+        st.session_state.params['krome'] = st.number_input("Krome Karton Ton (TRY TL)", value=st.session_state.params['krome'])
+        st.session_state.params['kuse'] = st.number_input("Kuşe Ton (€ EUR)", value=st.session_state.params['kuse'])
+        st.session_state.params['hamur'] = st.number_input("1. Hamur Ton ($ USD)", value=st.session_state.params['hamur'])
+        
+        st.markdown("#### 3. Yüzey İşlemleri ve Lak Grubu")
+        st.session_state.params['mat_sel'] = st.number_input("Mat Selofan M2 (TL)", value=st.session_state.params['mat_sel'])
+        st.session_state.params['par_sel'] = st.number_input("Parlak Selofan M2 (TL)", value=st.session_state.params['par_sel'])
+        st.session_state.params['lokal_lak'] = st.number_input("Lokal Lak 50x70 (Tabaka)", value=st.session_state.params['lokal_lak'])
+        st.session_state.params['kab_lak'] = st.number_input("Kabartma Lak 50x70 (Tabaka)", value=st.session_state.params['kab_lak'])
+
     with col2:
-        st.markdown("#### 2. Baskı Grubu")
-        p_5070_cmyk = st.number_input("50x70 Cmyk Proses (TL)", value=3500.0)
-        p_5070_tiraj = st.number_input("50x70 Tiraj Fiyatı (TL)", value=800.0)
-        p_70100_cmyk = st.number_input("70x100 Cmyk Proses (TL)", value=5000.0)
-        p_70100_tiraj = st.number_input("70x100 Tiraj Fiyatı (TL)", value=1400.0)
+        st.markdown("#### 2. Baskı Grubu (Ebat, Renk ve Tiraj)")
+        st.session_state.params['b_5070_cmyk'] = st.number_input("50x70 Cmyk Proses (TL)", value=st.session_state.params['b_5070_cmyk'])
+        st.session_state.params['b_5070_tiraj'] = st.number_input("50x70 Tiraj Fiyatı (TL)", value=st.session_state.params['b_5070_tiraj'])
+        st.session_state.params['b_70100_cmyk'] = st.number_input("70x100 Cmyk Proses (TL)", value=st.session_state.params['b_70100_cmyk'])
+        st.session_state.params['b_70100_tiraj'] = st.number_input("70x100 Tiraj Fiyatı (TL)", value=st.session_state.params['b_70100_tiraj'])
+
+        st.markdown("#### 4. Kesim ve Mücellit Grubu")
+        st.session_state.params['kazanli'] = st.number_input("Kazanlı Kesim Çember (TL)", value=st.session_state.params['kazanli'])
+        st.session_state.params['kazanli_tiraj'] = st.number_input("Kazanlı Kesim Tiraj (TL)", value=st.session_state.params['kazanli_tiraj'])
+        st.session_state.params['bobst'] = st.number_input("Bobst Kesim Çember (TL)", value=st.session_state.params['bobst'])
+        st.session_state.params['yap_tiraj'] = st.number_input("Omega Yapıştırma Tiraj (TL)", value=st.session_state.params['yap_tiraj'])
 
 # 3. FİYAT ÇIKART (HESAPLAMA) SAYFASI
 elif st.session_state.page == 'calc':
@@ -71,7 +116,7 @@ elif st.session_state.page == 'calc':
     c1, c2 = st.columns(2)
     with c1:
         firma = st.text_input("Firma Adı", "Erhan Ticaret")
-        urun_adi = st.text_input("Ürün Adı / Modeli", "Lüks Parfüm Kutusu")
+        urun_adi = st.text_input("Ürün Adı / Modeli", "Lüks Kutu Ambalaj")
         adet = st.number_input("Ürün Adedi (Tiraj)", value=5000, step=500, min_value=1)
         kagit_cinsi = st.selectbox("Kağıt Cinsi", ["Amerikan Bristol", "Krome Karton", "Kuşe Kağıt", "1. Hamur"])
         gramaj = st.selectbox("Kağıt Gramajı (gr/m²)", [200, 250, 300, 350, 400], index=2)
@@ -91,34 +136,32 @@ elif st.session_state.page == 'calc':
     nakliye = st.checkbox("Nakliye Dahil", value=True)
     kar_orani = st.slider("Hedef Kar Marjı (%)", 0, 100, 30)
 
-    # Hesaplama Motoru
-    usd_kur = 49.97
-    eur_kur = 56.00
-    
-    ton_fiyat = 825.0
+    # Hesaplama Motorunda Canlı TCMB Kurları Kullanılır
+    ton_fiyat = st.session_state.params['bristol']
     birim_tip = 'USD'
-    if kagit_cinsi == "Amerikan Bristol": ton_fiyat, birim_tip = 825.0, 'USD'
-    elif kagit_cinsi == "Krome Karton": ton_fiyat, birim_tip = 40000.0, 'TL'
-    elif kagit_cinsi == "Kuşe Kağıt": ton_fiyat, birim_tip = 850.0, 'EUR'
-    elif kagit_cinsi == "1. Hamur": ton_fiyat, birim_tip = 1200.0, 'USD'
+    if kagit_cinsi == "Amerikan Bristol": ton_fiyat, birim_tip = st.session_state.params['bristol'], 'USD'
+    elif kagit_cinsi == "Krome Karton": ton_fiyat, birim_tip = st.session_state.params['krome'], 'TL'
+    elif kagit_cinsi == "Kuşe Kağıt": ton_fiyat, birim_tip = st.session_state.params['kuse'], 'EUR'
+    elif kagit_cinsi == "1. Hamur": ton_fiyat, birim_tip = st.session_state.params['hamur'], 'USD'
 
     ton_fiyat_tl = ton_fiyat
-    if birim_tip == 'USD': ton_fiyat_tl = ton_fiyat * usd_kur
-    elif birim_tip == 'EUR': ton_fiyat_tl = ton_fiyat * eur_kur
+    if birim_tip == 'USD': ton_fiyat_tl = ton_fiyat * canli_usd
+    elif birim_tip == 'EUR': ton_fiyat_tl = ton_fiyat * canli_eur
 
     tabaka_adeti = max(1, adet // 2)
     kg_kagit = round((tabaka_adeti * (x_val/1000) * (y_val/1000) * gramaj) / 2)
     kagit_maliyeti = (kg_kagit / 1000) * ton_fiyat_tl
 
-    baski_maliyeti = 3500.0 + (adet * 800.0 / 1000)
+    baski_maliyeti = st.session_state.params['b_5070_cmyk'] + (adet * st.session_state.params['b_5070_tiraj'] / 1000)
     if "70x100" in baski_turu:
-        baski_maliyeti = 5000.0 + (adet * 1400.0 / 1000)
+        baski_maliyeti = st.session_state.params['b_70100_cmyk'] + (adet * st.session_state.params['b_70100_tiraj'] / 1000)
 
     selofan_m2 = tabaka_adeti * 0.35
-    selofan_maliyeti = selofan_m2 * 4.70 if laminasyon != "Yok" else 0
+    selofan_birim = st.session_state.params['mat_sel'] if laminasyon == "Mat Selofan" else st.session_state.params['par_sel']
+    selofan_maliyeti = selofan_m2 * selofan_birim if laminasyon != "Yok" else 0
 
-    kesim_maliyeti = (3000.0 + (adet * 1.50)) if kesim == "Bobst Kesim" else (1800.0 + (adet * 0.75) if kesim == "Kazanlı / Pedal Kesim" else 0)
-    yapistirma_maliyeti = (2500.0 + (adet * 0.25)) if yapistirma else 0
+    kesim_maliyeti = (st.session_state.params['bobst'] + (adet * 1.50)) if kesim == "Bobst Kesim" else (st.session_state.params['kazanli'] + (adet * st.session_state.params['kazanli_tiraj']) if kesim == "Kazanlı / Pedal Kesim" else 0)
+    yapistirma_maliyeti = (2500.0 + (adet * st.session_state.params['yap_tiraj'])) if yapistirma else 0
     nakliye_maliyeti = 4000.0 if nakliye else 0
     toplam_ek = yapistirma_maliyeti + nakliye_maliyeti
 
