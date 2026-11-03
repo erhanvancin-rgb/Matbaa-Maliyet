@@ -28,36 +28,43 @@ def tcmb_kurlarini_getir():
 
 canli_usd, canli_eur = tcmb_kurlarini_getir()
 
-# Oturum Durumu ve EXCEL'DEKİ TÜM PARAMETRELER EKSİKSİZ
+# Oturum Durumu ve Eksiksiz Varsayılan Parametreler
 if 'page' not in st.session_state:
     st.session_state.page = 'home'
 
+default_params = {
+    # 1. Kağıt ve Karton Grubu
+    'bristol': 825.0, 'krome': 40000.0, 'kuse': 850.0, 'hamur': 1200.0,
+    
+    # 2. Baskı Grubu
+    'b_3550_cmyk': 1800.0, 'b_3550_pantone': 900.0, 'b_3550_tiraj': 400.0,
+    'b_5070_cmyk': 3500.0, 'b_5070_pantone': 1750.0, 'b_5070_tiraj': 800.0,
+    'b_70100_cmyk': 5000.0, 'b_70100_pantone': 1750.0, 'b_70100_tiraj': 1400.0,
+    
+    # 3. Yüzey İşlemleri ve Lak Grubu
+    'disp_5070': 1500.0, 'disp_5070_tiraj': 800.0,
+    'disp_70100': 2000.0, 'disp_70100_tiraj': 1000.0,
+    'mat_sel': 4.70, 'par_sel': 4.50,
+    'lokal_5070': 1500.0, 'lokal_5070_tiraj': 1.5,
+    'lokal_70100': 1800.0, 'lokal_70100_tiraj': 1.5,
+    'kab_5070': 1600.0, 'kab_5070_tiraj': 1.6,
+    'kab_70100': 1900.0, 'kab_70100_tiraj': 1.9,
+    
+    # 4. Kesim ve Mücellit Grubu
+    'kazanli': 1800.0, 'kazanli_tiraj': 0.75,
+    'pedal': 2500.0, 'pedal_tiraj': 1.0,
+    'bobst': 3000.0, 'bobst_tiraj': 1.5,
+    'omega_tek': 2000.0, 'omega_tek_tiraj': 0.2,
+    'omega_dip': 2500.0, 'omega_dip_tiraj': 0.25
+}
+
 if 'params' not in st.session_state:
-    st.session_state.params = {
-        # 1. Kağıt ve Karton Grubu
-        'bristol': 825.0, 'krome': 40000.0, 'kuse': 850.0, 'hamur': 1200.0,
-        
-        # 2. Baskı Grubu
-        'b_3550_cmyk': 1800.0, 'b_3550_pantone': 900.0, 'b_3550_tiraj': 400.0,
-        'b_5070_cmyk': 3500.0, 'b_5070_pantone': 1750.0, 'b_5070_tiraj': 800.0,
-        'b_70100_cmyk': 5000.0, 'b_70100_pantone': 1750.0, 'b_70100_tiraj': 1400.0,
-        
-        # 3. Yüzey İşlemleri ve Lak Grubu
-        'disp_5070': 1500.0, 'disp_5070_tiraj': 800.0,
-        'disp_70100': 2000.0, 'disp_70100_tiraj': 1000.0,
-        'mat_sel': 4.70, 'par_sel': 4.50,
-        'lokal_5070': 1500.0, 'lokal_5070_tiraj': 1.5,
-        'lokal_70100': 1800.0, 'lokal_70100_tiraj': 1.5,
-        'kab_5070': 1600.0, 'kab_5070_tiraj': 1.6,
-        'kab_70100': 1900.0, 'kab_70100_tiraj': 1.9,
-        
-        # 4. Kesim ve Mücellit Grubu
-        'kazanli': 1800.0, 'kazanli_tiraj': 0.75,
-        'pedal': 2500.0, 'pedal_tiraj': 1.0,
-        'bobst': 3000.0, 'bobst_tiraj': 1.5,
-        'omega_tek': 2000.0, 'omega_tek_tiraj': 0.2,
-        'omega_dip': 2500.0, 'omega_dip_tiraj': 0.25
-    }
+    st.session_state.params = default_params
+else:
+    # Eksik anahtarlar varsa otomatik ekle (KeyError önlemi)
+    for k, v in default_params.items():
+        if k not in st.session_state.params:
+            st.session_state.params[k] = v
 
 def go_home(): st.session_state.page = 'home'
 def go_params(): st.session_state.page = 'params'
