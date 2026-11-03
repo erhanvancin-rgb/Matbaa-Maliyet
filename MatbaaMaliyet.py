@@ -120,7 +120,7 @@ elif st.session_state.page == 'calc':
     st.subheader("📋 Ürün Bilgileri ve Maliyet Hesaplama Formu")
     st.markdown("---")
 
-    # 1. Firma og Ürün Genel Bilgileri
+    # 1. Firma ve Ürün Genel Bilgileri
     col1, col2 = st.columns(2)
     with col1:
         firma_adi = st.text_input("Firma Adı", "Erhan Ticaret", key="form_firma")
@@ -176,15 +176,25 @@ elif st.session_state.page == 'calc':
 
     st.markdown("---")
 
-    # 6. Ebat Bilgileri (En x Boy x Yükseklik)
-    st.markdown("##### 📐 Bitmiş Ebat (mm)")
-    col_e1, col_e2, col_e3 = st.columns(3)
+    # 6. Ebat Bilgileri (En x Boy x Yükseklik) ve Matbaa Planlama Parametreleri
+    st.markdown("##### 📐 Bitmiş Ebat (mm) ve Matbaa Planlama Kriterleri")
+    col_e1, col_e2, col_e3, col_e4 = st.columns(4)
     with col_e1:
         ebat_en = st.number_input("En (mm)", value=200, key="form_ebat_en")
     with col_e2:
         ebat_boy = st.number_input("Boy (mm)", value=150, key="form_ebat_boy")
     with col_e3:
         ebat_yukseklik = st.number_input("Yükseklik (mm)", value=50, key="form_ebat_yukseklik")
+    with col_e4:
+        fire_orani = st.number_input("Fire Oranı (%)", value=5.0, step=0.5, key="form_fire_orani")
+
+    col_p1, col_p2, col_p3 = st.columns(3)
+    with col_p1:
+        basilacak_ebat = st.selectbox("Basılacak Kağıdın Ebadı", ["50x70 cm", "70x100 cm", "35x50 cm"], key="form_basilacak_ebat")
+    with col_p2:
+        baski_metodu = st.selectbox("Baskı Metodu", ["Tabaka Ofset", "Bobin Ofset", "Dijital Baskı"], key="form_baski_metodu")
+    with col_p3:
+        montaj_plani = st.selectbox("Montaj Planı", ["Forma (Tek Yüz)", "Karşılıklı Forma", "Özel Yerleşim"], key="form_montaj_plani")
 
     st.markdown("---")
 
@@ -211,11 +221,11 @@ elif st.session_state.page == 'calc':
     ozel_istekler = st.text_area("Özel İstekler", placeholder="Müşteriye özel ek talepler...", key="form_ozel_istekler")
 
     st.markdown("---")
-    st.markdown("### 📊 Maliyet ve Fiyatlandırma Bölümü (A Adet Bazlı)")
+    st.markdown("### 📊 Matbaa Planlama, Maliyet ve Fiyatlandırma Özeti (A Adet Bazlı)")
     
     kar_orani = st.slider("Hedef Kar Marjı (%)", 0, 100, 30, key="form_kar_orani")
 
-    # --- HESAPLAMA MOTORU ---
+    # --- HESAPLAMA MOTORU (Planlama ve Finansal Döküm) ---
     params = st.session_state.params
     ton_fiyat = params['bristol']
     birim_tip = 'USD'
@@ -228,11 +238,21 @@ elif st.session_state.page == 'calc':
     if birim_tip == 'USD': ton_fiyat_tl = ton_fiyat * canli_usd
     elif birim_tip == 'EUR': ton_fiyat_tl = ton_fiyat * canli_eur
 
-    tabaka_adeti = max(1, adet_a // 2)
-    kg_kagit = round((tabaka_adeti * (ebat_en/1000) * (ebat_boy/1000) * gramaj_a) / 2)
+    # Planlama Hesaplamaları
+    brut_adet = int(adet_a * (1 + (fire_orani / 100)))
+    tabaka_adeti = max(1, brut_adet // 2)
+    
+    # M2 Hesabı
+    kağıt_en_m = 0.70 if "70x100" in basilacak_ebat else (0.50 if "50x70" in basilacak_ebat else 0.35)
+    kağıt_boy_m = 1.00 if "70x100" in basilacak_ebat else (0.70 if "50x70" in basilacak_ebat else 0.50)
+    toplam_m2 = round(tabaka_adeti * kağıt_en_m * kağıt_boy_m, 2)
+
+    kg_kagit = round((tabaka_adeti * kağıt_en_m * kağıt_boy_m * gramaj_a) / 1000, 2)
     kagit_maliyeti = (kg_kagit / 1000) * ton_fiyat_tl
 
     baski_maliyeti = params['b_5070_cmyk'] + (adet_a * params['b_5070_tiraj'] / 1000)
+    if "70x100" in basilacak_ebat:
+        baski_maliyeti = params['b_70100_cmyk'] + (adet_a * params['b_70100_tiraj'] / 1000)
     if baski_cmyk == "Çift Yüz":
         baski_maliyeti *= 1.8
     elif baski_cmyk == "CMYK Baskı Yok":
@@ -260,10 +280,17 @@ elif st.session_state.page == 'calc':
     birim_maliyet = toplam_maliyet / adet_a if adet_a > 0 else 0
     karli_birim_fiyat = toplam_karli_fiyat / adet_a if adet_a > 0 else 0
 
+    # Görsel Planlama Metrikleri (Plan, Brüt Adet, Kağıt Kg, M2 vb.)
+    p1, p2, p3, p4 = st.columns(4)
+    p1.metric("Brüt Adet (Fireli)", f"{brut_adet:,} adet")
+    p2.metric("Tabaka Adedi", f"{tabaka_adeti:,} tabaka")
+    p3.metric("Kağıt Miktarı", f"{kg_kagit} kg")
+    p4.metric("Toplam Alan", f"{toplam_m2:,.2f} m²")
+
     r1, r2, r3 = st.columns(3)
-    r1.metric("Kağıt Miktarı", f"{kg_kagit} kg")
-    r2.metric("Tabaka Adedi", f"{tabaka_adeti:,} tabaka")
-    r3.metric("Baskı Maliyeti", f"₺{baski_maliyeti:,.2f}")
+    r1.metric("Kağıt Maliyeti", f"₺{kagit_maliyeti:,.2f}")
+    r2.metric("Baskı Maliyeti", f"₺{baski_maliyeti:,.2f}")
+    r3.metric("Kesim & Mücellit", f"₺{kesim_maliyeti:,.2f}")
 
     m1, m2, m3 = st.columns(3)
     m1.metric("Toplam Maliyet", f"₺{toplam_maliyet:,.2f}")
