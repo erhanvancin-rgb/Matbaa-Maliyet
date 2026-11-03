@@ -96,7 +96,7 @@ elif st.session_state.page == 'calc':
     eur_kur = 56.00
     
     ton_fiyat = 825.0
-     birim_tip = 'USD'
+    birim_tip = 'USD'
     if kagit_cinsi == "Amerikan Bristol": ton_fiyat, birim_tip = 825.0, 'USD'
     elif kagit_cinsi == "Krome Karton": ton_fiyat, birim_tip = 40000.0, 'TL'
     elif kagit_cinsi == "Kuşe Kağıt": ton_fiyat, birim_tip = 850.0, 'EUR'
