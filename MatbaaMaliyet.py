@@ -663,4 +663,5 @@ elif st.session_state.page == 'teklif':
             "Matbaa & Ambalaj Üretim Yönetimi"
         ])
 
-        letter_text = chr(10).join(letter_
+        letter_text = "\n".join(letter_lines)
+        st.text_area("Yazışmalarınız için Teklif Mektubu", value=letter_text, height=350)
