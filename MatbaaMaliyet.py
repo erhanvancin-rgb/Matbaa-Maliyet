@@ -514,8 +514,6 @@ elif st.session_state.page == 'calc':
         return best_m
 
     def makine_ve_ebat_sec_optimum(adet, gramaj, kagit):
-        # ADAY EBATLAR: 70x100 ve yüksek tirajlar için 60x95 gibi optimum adaylar
-        # Sistem her aday için hem kağıt maliyetini hem de baskı maliyetini hesaplayıp EN UCUZUNU seçer.
         adaylar = []
         if adet >= 50000:
             adaylar.append(("60x95 cm (Özel Bobin Kesim)", 600.0, 950.0, "70100", 15.0))
@@ -537,11 +535,9 @@ elif st.session_state.page == 'calc':
                 kagit_adi, makine_kodu, tw, th, makas, montaj, 0.0, ebat_en, ebat_boy, ebat_yukseklik
             )
 
-            # 600 kg kuralı kontrolü
             if "Özel Bobin Kesim" in kagit_adi and res['kg_kagit'] < 600:
                 continue
 
-            # İKİNCİ SINAMA NOKTASI: Kağıt + Baskı + Kesim toplam maliyeti en düşük olan seçilir
             if res['toplam_uretim_maliyeti'] < en_dusuk_toplam_maliyet:
                 en_dusuk_toplam_maliyet = res['toplam_uretim_maliyeti']
                 if adet <= 1500: fire = 10.0
@@ -555,7 +551,6 @@ elif st.session_state.page == 'calc':
 
         return en_iyi_sonuc
 
-    # Alternatifler bağımsız ve makine maliyeti sınamalı olarak hesaplanıyor
     plan_params = []
     plan_params.append({**makine_ve_ebat_sec_optimum(net_a, gramaj_a, kagit_cinsi_a), 'kod': 'A'})
     plan_params.append({**makine_ve_ebat_sec_optimum(net_b, gramaj_a, kagit_cinsi_a), 'kod': 'B'})
@@ -605,4 +600,116 @@ elif st.session_state.page == 'calc':
             {"Parametre / Kriter": "Tabaka Ebadı ve Sayısı", "Değer": f"{p['ebat']} ({r['tabaka_adeti']:,} tabaka)"},
             {"Parametre / Kriter": "Baskı Kalıp Sayısı", "Değer": f"{r['kalıp_sayisi']} Adet Kalıp"},
             {"Parametre / Kriter": "Kullanılan Kağıt (Makine)", "Değer": p['ebat']},
-            {"Parametre / Kriter": "Kağıt Kilogram (kg)", "Değer": f"{
+            {"Parametre / Kriter": "Kağıt Kilogram (kg)", "Değer": f"{r['kg_kagit']} kg"},
+            {"Parametre / Kriter": "Baskı Adedi ve Geçiş Sayısı", "Değer": f"{r['tabaka_adeti']:,} tabaka x {r['gecis_sayisi']} geçiş"},
+            {"Parametre / Kriter": "Baskı Metodu", "Değer": r['gercek_baski_yuzu']},
+            {"Parametre / Kriter": "Kaç M2", "Değer": f"{r['toplam_m2']:,.2f} m²"}
+        ])
+        
+        st.table(plan_df)
+
+    if ikinci_kagit_var:
+        st.markdown("#### 🔹 Kağıt A Alternatifleri")
+        col_p1, col_p2, col_p3 = st.columns(3)
+        with col_p1: 
+            st.markdown("##### Alternatif A")
+            plan_kartini_yazdir(teklif_alternatifleri[0])
+        with col_p2: 
+            st.markdown("##### Alternatif B")
+            plan_kartini_yazdir(teklif_alternatifleri[1])
+        with col_p3: 
+            st.markdown("##### Alternatif C")
+            plan_kartini_yazdir(teklif_alternatifleri[2])
+
+        st.markdown("#### 🔹 Kağıt B Alternatifleri")
+        col_p4, col_p5, col_p6 = st.columns(3)
+        with col_p4: 
+            st.markdown("##### Alternatif A2")
+            plan_kartini_yazdir(teklif_alternatifleri[3])
+        with col_p5: 
+            st.markdown("##### Alternatif B2")
+            plan_kartini_yazdir(teklif_alternatifleri[4])
+        with col_p6: 
+            st.markdown("##### Alternatif C2")
+            plan_kartini_yazdir(teklif_alternatifleri[5])
+    else:
+        col_p1, col_p2, col_p3 = st.columns(3)
+        with col_p1: 
+            st.markdown("##### Alternatif A")
+            plan_kartini_yazdir(teklif_alternatifleri[0])
+        with col_p2: 
+            st.markdown("##### Alternatif B")
+            plan_kartini_yazdir(teklif_alternatifleri[1])
+        with col_p3: 
+            st.markdown("##### Alternatif C")
+            plan_kartini_yazdir(teklif_alternatifleri[2])
+
+    st.markdown("---")
+    if st.button("📄 Müşteri İçin Hazır Fiyat Teklif Sayfasına Git", use_container_width=True, key="calc_to_teklif"):
+        go_page('teklif')
+        st.rerun()
+
+# ==========================================
+# MENÜ 4: MÜŞTERİ FİYAT TEKLİF SAYFASI
+# ==========================================
+elif st.session_state.page == 'teklif':
+    st.subheader("📄 Müşteri Fiyat Teklifi ve Ürün Şartnamesi")
+    
+    if st.session_state.teklif_data is None:
+        st.warning("⚠️ Henüz bir hesaplama yapılmadı. Lütfen önce 'Fiyat Çıkart' modülünden ürün hesaplamasını gerçekleştirin.")
+        if st.button("Forma Dön", key="teklif_to_calc"):
+            go_page('calc')
+            st.rerun()
+    else:
+        td = st.session_state.teklif_data
+        kar_orani = td['kar_orani']
+
+        st.markdown(
+            "<div style='background-color: #f8f9fa; padding: 20px; border-radius: 10px; border-left: 5px solid #1F4E78;'>"
+            "<h3 style='margin: 0; color: #1F4E78;'>OFFICIAL PRICE QUOTATION / FİYAT TEKLİF MEKTUBU</h3>"
+            f"<p style='margin: 5px 0 0 0;'><strong>Sayın:</strong> {td['firma_adi']}</p>"
+            "<p style='margin: 2px 0 0 0;'><strong>Tarih:</strong> 04 Kasım 2026 | <strong>Teklif No:</strong> OFF-2026-8492</p>"
+            "</div>", 
+            unsafe_allow_html=True
+        )
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("#### 1. Ürün & İmalat Teknik Özellikleri")
+        
+        col_t1, col_t2, col_t3 = st.columns(3)
+        with col_t1:
+            st.write(f"**Ürün Adı:** {td['urun_adi']}")
+            st.write(f"**Ürün Tipi:** {td['urun_tipi']}")
+            st.write(f"**Ebat:** {td['ebat_en']} mm x {td['ebat_boy']} mm x {td['ebat_yukseklik']} mm")
+        with col_t2:
+            st.write(f"**Baskı CMYK:** {td['cmyk_secim']}")
+            st.write(f"**Pantone Renk:** {td['pantone_secimi']}")
+            st.write(f"**Yüzey Kaplama:** {td['laminasyon']}")
+        with col_t3:
+            st.write(f"**Özel İşlem:** {td['ozel_baski']}")
+            st.write(f"**Kesim/Mücellit:** {td['baski_sonrasi']}")
+
+        st.markdown("---")
+        st.markdown("#### 2. Adet Alternatiflerine Göre Fiyat Tablosu")
+
+        table_rows = []
+        for alt in td['alternatifler']:
+            res = alt['res']
+            net_adet = alt['adet']
+            net_maliyet = res['toplam_uretim_maliyeti']
+            kar_tutari = net_maliyet * (kar_orani / 100.0)
+            toplam_satis_tl = net_maliyet + kar_tutari
+            birim_satis_tl = toplam_satis_tl / net_adet if net_adet > 0 else 0
+
+            table_rows.append({
+                "Alternatif": f"Option {alt['kod']}",
+                "Net Adet": f"{net_adet:,} adet",
+                "Kağıt Özelliği": f"{alt['gramaj']} gr {alt['kagit']}",
+                "Tabaka Ebadı": alt['ebat'],
+                "Kağıt Ağırlığı": f"{res['kg_kagit']} kg",
+                "Birim Satış Fiyatı (TL)": f"₺{birim_satis_tl:,.4f}",
+                "Karlı Toplam Tutar (TL)": f"₺{toplam_satis_tl:,.2f}"
+            })
+
+        df_teklif = pd.DataFrame(table_rows)
+        st.dataframe(df_teklif, use_container_width=True, hide_index=True)
