@@ -6,7 +6,7 @@ import pandas as pd
 import json
 import os
 
-st.set_page_config(page_title="Matbaa ve Ambalaj Maliyet & Teklif Sistemi", layout="wide")
+st.set_page_config(page_title="Matbaa and Ambalaj Maliyet & Teklif Sistemi", layout="wide")
 
 # --- 0. KALICI JSON PARAMETRE YÖNETİMİ ---
 PARAM_FILE = "matbaa_parametreleri.json"
@@ -246,7 +246,7 @@ elif st.session_state.page == 'calc':
         revolta_uygun_kagit = kagit_cinsi in ["Kuşe Kağıt", "1. Hamur Kağıt"]
         
         gercek_baski_yuzu = baski_yuzu
-        if baski_yuzu in ["Çift Yüz", "Ön dan Arka Baskı", "Çift Yüz"]:
+        if baski_yuzu in ["Çift Yüz", "Ön ve Arka Baskı"]:
             if revolta_uygun_kagit and (montaj_adedi % 2 == 0):
                 gercek_baski_yuzu = "Revolta Baskı"
             else:
@@ -398,11 +398,11 @@ elif st.session_state.page == 'calc':
 
     col_ebat1, col_ebat2, col_ebat3, col_baski1, col_baski2 = st.columns(5)
     with col_ebat1:
-        ebat_en = st.number_input("En (mm) [A]", value=290, key="ebat_en")
+        ebat_en = st.number_input("En (mm) [A]", value=340, key="ebat_en")
     with col_ebat2:
-        ebat_boy = st.number_input("Boy (mm) [B]", value=290, key="ebat_boy")
+        ebat_boy = st.number_input("Boy (mm) [B]", value=340, key="ebat_boy")
     with col_ebat3:
-        ebat_yukseklik = st.number_input("Yükseklik (mm) [C]", value=100, key="ebat_yukseklik")
+        ebat_yukseklik = st.number_input("Yükseklik (mm) [C]", value=120, key="ebat_yukseklik")
     with col_baski1:
         cmyk_secim = st.selectbox("Baskı CMYK", ["Çift Yüz", "Tek Yüz", "CMYK Baskı yok"], key="cmyk_secim")
     with col_baski2:
@@ -426,16 +426,12 @@ elif st.session_state.page == 'calc':
     ozel_istekler = st.text_input("Özel İstekler", "", placeholder="Özel talepleri buraya yazınız...", key="ozel_istekler")
     st.markdown("---")
 
+    # --- KESİN DOĞRULANMIŞ AÇINIM FORMÜLÜ ---
     def kutu_acik_ebat_hesapla(en, boy, yukseklik, kutu_tipi):
-        if kutu_tipi in ["Standart Kutu", "İlaç Tipi Kutu"]:
-            acik_en = (2 * (en + boy)) + 15.0
-            acik_boy = boy + (2 * yukseklik) + 20.0
-        elif kutu_tipi in ["Dip Kilitli Kutu", "Dip Kilit Yapıştırmalı Kutu"]:
-            acik_en = (2 * (en + boy)) + 15.0
-            acik_boy = boy + (2 * yukseklik) + 35.0
-        else:
-            acik_en = (2 * (en + boy)) + 15.0
-            acik_boy = boy + (2 * yukseklik) + 20.0
+        # Açık En = (En * 2) + (Yükseklik * 2) + 15 mm kulak
+        acik_en = (en * 2) + (yukseklik * 2) + 15.0
+        # Açık Boy = Boy + (Yükseklik * 2) + 30 mm kulaklar
+        acik_boy = boy + (yukseklik * 2) + 30.0
         return acik_en, acik_boy
 
     def fiziksel_montaj_bul(tw, th, w, h, makas, kutu_formu):
@@ -493,22 +489,24 @@ elif st.session_state.page == 'calc':
             aday_kagitlar.append(("50x70 cm (Standart)", 500.0, 700.0, "5070", 12.0))
             aday_kagitlar.append(("35x50 cm (Standart)", 350.0, 500.0, "3550", 10.0))
             
-            for w_cm in range(30, 75, 5):
-                for h_cm in range(w_cm, 105, 5):
+            # Özel Bobin Ebatları (5cm aralıklarla 105 cm'e kadar)
+            for w_cm in range(30, 105, 5):
+                for h_cm in range(w_cm, 120, 5):
                     if (w_cm, h_cm) not in [(35,50), (50,70), (70,100)]:
                         if w_cm <= 35 and h_cm <= 50:
                             makine_k, makas_k = "3550", 10.0
                         elif w_cm <= 50 and h_cm <= 70:
                             makine_k, makas_k = "5070", 12.0
-                        elif w_cm <= 70 and h_cm <= 100:
+                        elif w_cm <= 100 and h_cm <= 100:
                             makine_k, makas_k = "70100", 15.0
                         else:
                             continue
                         aday_kagitlar.append((f"{w_cm}x{h_cm} cm (Özel Bobin Kesim)", float(w_cm*10), float(h_cm*10), makine_k, makas_k))
             
+            # Tam açınıma göre nokta atışı özel bobin ebadı
             ideal_w_cm = math.ceil((w_bleed) / 10.0) * 10
             ideal_h_cm = math.ceil((h_bleed) / 10.0) * 10
-            if ideal_w_cm <= 70 and ideal_h_cm <= 100:
+            if ideal_w_cm <= 100 and ideal_h_cm <= 100:
                 m_k = "3550" if ideal_w_cm<=35 and ideal_h_cm<=50 else ("5070" if ideal_w_cm<=50 and ideal_h_cm<=70 else "70100")
                 m_s = 10.0 if m_k=="3550" else (12.0 if m_k=="5070" else 15.0)
                 aday_kagitlar.append((f"{ideal_w_cm}x{ideal_h_cm} cm (Özel Bobin Kesim)", float(ideal_w_cm*10), float(ideal_h_cm*10), m_k, m_s))
@@ -538,8 +536,8 @@ elif st.session_state.page == 'calc':
                 en_iyi_sonuc = {'adet': adet, 'gramaj': gramaj, 'kagit': kagit, 'fire': fire, 'ebat': kagit_adi, 'res': res}
 
         if en_iyi_sonuc is None:
-            res = hesapla_maliyet_detayli(adet, gramaj, kagit, cmyk_secim, pantone_sayisi, laminasyon, ozel_baski_1, ozel_baski_2, baski_sonrasi, "55x80 cm (Özel Bobin Kesim)", "70100", 550.0, 800.0, 15.0, 1, 0.0, ebat_en, ebat_boy, ebat_yukseklik)
-            en_iyi_sonuc = {'adet': adet, 'gramaj': gramaj, 'kagit': kagit, 'fire': 5.0, 'ebat': "55x80 cm (Özel Bobin Kesim)", 'res': res}
+            res = hesapla_maliyet_detayli(adet, gramaj, kagit, cmyk_secim, pantone_sayisi, laminasyon, ozel_baski_1, ozel_baski_2, baski_sonrasi, "70x100 cm (Standart)", "70100", 700.0, 1000.0, 15.0, 1, 0.0, ebat_en, ebat_boy, ebat_yukseklik)
+            en_iyi_sonuc = {'adet': adet, 'gramaj': gramaj, 'kagit': kagit, 'fire': 5.0, 'ebat': "70x100 cm (Standart)", 'res': res}
 
         return en_iyi_sonuc
 
@@ -577,7 +575,7 @@ elif st.session_state.page == 'calc':
         "alternatifler": teklif_alternatifleri
     }
 
-    st.markdown("### 📊 ÜRETİM VE PLANLAMA ÖZETİ")
+    st.markdown("### 📊 ÜRETİM VE PLANLAMA ÖZETİ (GÜNCELLENMİŞ FORMÜL)")
 
     def plan_kartini_yazdir(p):
         r = p['res']
