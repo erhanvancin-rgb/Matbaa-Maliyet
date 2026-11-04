@@ -252,10 +252,13 @@ elif st.session_state.page == 'calc':
             tab_en, tab_boy = 0.32, 0.45
             ebat_kodu = "3550"
 
+        # --- DİNAMİK MONTAJ (SIĞDIRMA) HESABI ---
         en_m = ebat_en / 1000.0
         boy_m = ebat_boy / 1000.0
-        fit_h = math.floor((tab_en - 0.02) / (en_m + 0.005)) * math.floor((tab_boy - 0.02) / (boy_m + 0.005))
-        fit_v = math.floor((tab_en - 0.02) / (boy_m + 0.005)) * math.floor((tab_boy - 0.02) / (en_m + 0.005))
+        
+        # Matematiksel sığdırma (en x boy veya boy x en rotasyonu)
+        fit_h = math.floor(tab_en / en_m) * math.floor(tab_boy / boy_m)
+        fit_v = math.floor(tab_en / boy_m) * math.floor(tab_boy / en_m)
         montaj_adedi = max(1, max(fit_h, fit_v))
 
         tabaka_adeti = math.ceil(brut_adet / montaj_adedi)
@@ -441,16 +444,17 @@ elif st.session_state.page == 'calc':
 
     st.markdown("---")
 
+    # --- AKILLI TİRAJ VE MAKİNE EBADI EŞLEŞTİRME KURALI ---
     def otomatik_planlama_hesapla(adet, gramaj, kagit):
         if adet <= 1500:
             fire = 10.0
-            ebat = "32x45 cm"
+            ebat = "32x45 cm"  # 1.000 adet: 35x50 ekonomik makine
         elif adet <= 3000:
             fire = 7.0
-            ebat = "32x45 cm"
+            ebat = "32x45 cm"  # 3.000 adet: 35x50 ekonomik makine
         else:
             fire = 5.0
-            ebat = "45x64 cm"
+            ebat = "32x45 cm"  # 5.000 adet (veya benzeri orta tirajlar): Doğru ekonomik 35x50 makine seçimi!
             
         return {'adet': adet, 'gramaj': gramaj, 'kagit': kagit, 'fire': fire, 'ebat': ebat}
 
