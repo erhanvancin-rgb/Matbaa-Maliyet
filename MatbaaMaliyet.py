@@ -213,12 +213,11 @@ elif st.session_state.page == 'params':
         st.session_state.params['omega_dip'] = st.number_input("Omega Dip Yapıştırma Hazırlık (₺)", value=st.session_state.params['omega_dip'], key="p_omd")
         st.session_state.params['omega_dip_tiraj'] = st.number_input("Omega Dip Yapıştırma Tiraj (Adet/₺)", value=st.session_state.params['omega_dip_tiraj'], key="p_omdt")
 
-    # Değişiklikleri otomatik kaydet
     parametreleri_kaydet(st.session_state.params)
     st.success("💾 Tüm parametre değişiklikleri kalıcı olarak kaydedildi.")
 
 # ==========================================
-# MENÜ 3: FORM VE HESAPLAMA MODÜLÜ (TİRAJ KADEME MANTIĞI)
+# MENÜ 3: FORM VE HESAPLAMA MODÜLÜ
 # ==========================================
 elif st.session_state.page == 'calc':
     def hesapla_maliyet_detayli(
@@ -240,25 +239,21 @@ elif st.session_state.page == 'calc':
 
         brut_adet = int(math.ceil(net_adet * (1 + (fire_pct / 100.0))))
         
-        if "70x100" in basilacak_ebat:
-            tab_en, tab_boy = 0.70, 1.00
-            ebat_kodu = "70100"
-        elif "50x70" in basilacak_ebat:
-            tab_en, tab_boy = 0.50, 0.70
-            ebat_kodu = "5070"
-        elif "35x50" in basilacak_ebat or "32x45" in basilacak_ebat:
+        # --- DOĞRU TABAKA EBADI VE KODU BELİRLEME ---
+        if "32x45" in basilacak_ebat or "35x50" in basilacak_ebat:
             tab_en, tab_boy = 0.32, 0.45
             ebat_kodu = "3550"
-        elif "64x90" in basilacak_ebat:
-            tab_en, tab_boy = 0.64, 0.90
-            ebat_kodu = "70100"
-        elif "45x64" in basilacak_ebat:
+        elif "50x70" in basilacak_ebat or "45x64" in basilacak_ebat:
             tab_en, tab_boy = 0.45, 0.64
             ebat_kodu = "5070"
-        else:
-            tab_en, tab_boy = 0.70, 1.00
+        elif "70x100" in basilacak_ebat or "64x90" in basilacak_ebat:
+            tab_en, tab_boy = 0.64, 0.90
             ebat_kodu = "70100"
+        else:
+            tab_en, tab_boy = 0.32, 0.45
+            ebat_kodu = "3550"
 
+        # --- DİNAMİK MONTAJ (SIĞDIRMA) HESABI ---
         en_m = ebat_en / 1000.0
         boy_m = ebat_boy / 1000.0
         fit_h = math.floor((tab_en - 0.02) / (en_m + 0.005)) * math.floor((tab_boy - 0.02) / (boy_m + 0.005))
@@ -288,7 +283,6 @@ elif st.session_state.page == 'calc':
         revolta_uygun = kagit_cinsi in ["Kuşe Kağıt", "1. Hamur Kağıt"]
         
         # --- DOĞRU TİRAJ KADEME HESAPLAMA FORMÜLÜ ---
-        # İlk 2.000 tabaka baz hazırlık ücreti, aşan kısım 1.000 adetlik tiraj birim fiyatı üzerinden hesaplanır.
         b_cmyk_base = params.get(f"b_{ebat_kodu}_cmyk", 2400.0)
         b_pantone_base = params.get(f"b_{ebat_kodu}_pantone", 1200.0)
         b_tiraj_rate = params.get(f"b_{ebat_kodu}_tiraj", 500.0)
@@ -421,11 +415,11 @@ elif st.session_state.page == 'calc':
 
     col_ebat1, col_ebat2, col_ebat3, col_baski1, col_baski2 = st.columns(5)
     with col_ebat1:
-        ebat_en = st.number_input("En (mm)", value=200, key="ebat_en")
+        ebat_en = st.number_input("En (mm)", value=210, key="ebat_en")
     with col_ebat2:
-        ebat_boy = st.number_input("Boy (mm)", value=150, key="ebat_boy")
+        ebat_boy = st.number_input("Boy (mm)", value=297, key="ebat_boy")
     with col_ebat3:
-        ebat_yukseklik = st.number_input("Yükseklik (mm)", value=50, key="ebat_yukseklik")
+        ebat_yukseklik = st.number_input("Yükseklik (mm)", value=0, key="ebat_yukseklik")
     with col_baski1:
         cmyk_secim = st.selectbox("Baskı CMYK", ["Tek Yüz", "Çift Yüz", "CMYK Baskı yok"], key="cmyk_secim")
     with col_baski2:
@@ -450,16 +444,17 @@ elif st.session_state.page == 'calc':
 
     st.markdown("---")
 
+    # --- AKILLI VE EKONOMİK OTOMATİK PLANLAMA SEÇİCİ ---
     def otomatik_planlama_hesapla(adet, gramaj, kagit):
         if adet <= 1500:
             fire = 10.0
-            ebat = "32x45 cm"
+            ebat = "32x45 cm"  # Düşük tirajda ekonomik 35x50 makine (32x45 ebadı)
         elif adet <= 3000:
             fire = 7.0
-            ebat = "64x90 cm"
+            ebat = "32x45 cm"  # 3.000 adetlik orta tirajda da 35x50 ekonomik makine tercih edilir
         else:
             fire = 5.0
-            ebat = "45x64 cm"
+            ebat = "45x64 cm"  # Yüksek tirajda 50x70 makine (45x64 ebadı) seri üretim
             
         return {'adet': adet, 'gramaj': gramaj, 'kagit': kagit, 'fire': fire, 'ebat': ebat}
 
@@ -595,102 +590,4 @@ elif st.session_state.page == 'teklif':
                     "<h3 style='margin: 0; color: #1F4E78;'>OFFICIAL PRICE QUOTATION / FİYAT TEKLİF MEKTUBU</h3>"
                     f"<p style='margin: 5px 0 0 0;'><strong>Sayın:</strong> {td['firma_adi']}</p>"
                     "<p style='margin: 2px 0 0 0;'><strong>Tarih:</strong> 03 Kasım 2026 | <strong>Teklif No:</strong> OFF-2026-8492</p>"
-                    "</div>", unsafe_allow_html=True)
-        
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown("#### 1. Ürün & İmalat Teknik Özellikleri")
-        
-        col_t1, col_t2, col_t3 = st.columns(3)
-        with col_t1:
-            st.write(f"**Ürün Adı:** {td['urun_adi']}")
-            st.write(f"**Ürün Tipi:** {td['urun_tipi']}")
-            st.write(f"**Ebat:** {td['ebat_en']} mm x {td['ebat_boy']} mm x {td['ebat_yukseklik']} mm")
-        with col_t2:
-            st.write(f"**Baskı CMYK:** {td['cmyk_secim']}")
-            st.write(f"**Pantone Renk:** {td['pantone_sayisi']}")
-            st.write(f"**Yüzey Kaplama:** {td['laminasyon']}")
-        with col_t3:
-            st.write(f"**Özel İşlem:** {td['ozel_baski']}")
-            st.write(f"**Kesim/Mücellit:** {td['baski_sonrasi']}")
-            if td.get('ozel_istekler'):
-                st.write(f"**Özel İstekler:** {td['ozel_istekler']}")
-
-        st.markdown("---")
-        st.markdown("#### 2. Adet Alternatiflerine Göre Fiyat Tablosu")
-
-        table_rows = []
-        for alt in td['alternatifler']:
-            res = alt['res']
-            net_adet = alt['adet']
-            net_maliyet = res['toplam_uretim_maliyeti']
-            kar_tutari = net_maliyet * (kar_orani / 100.0)
-            toplam_satis_tl = net_maliyet + kar_tutari
-            birim_satis_tl = toplam_satis_tl / net_adet if net_adet > 0 else 0
-            
-            toplam_satis_usd = toplam_satis_tl / canli_usd
-            toplam_satis_eur = toplam_satis_tl / canli_eur
-            birim_satis_usd = birim_satis_tl / canli_usd
-
-            table_rows.append({
-                "Alternatif": f"Option {alt['kod']}",
-                "Net Adet": f"{net_adet:,} adet",
-                "Kağıt Özelliği": f"{alt['gramaj']} gr {alt['kagit']}",
-                "Tabaka Ebadı": alt['ebat'],
-                "Kağıt Ağırlığı": f"{res['kg_kagit']} kg",
-                "Birim Satış Fiyatı (TL)": f"₺{birim_satis_tl:,.4f}",
-                "Birim Satış ($ USD)": f"${birim_satis_usd:,.4f}",
-                "Karlı Toplam Tutar (TL)": f"₺{toplam_satis_tl:,.2f}",
-                "Karlı Toplam ($ USD)": f"${toplam_satis_usd:,.2f}",
-                "Karlı Toplam (€ EUR)": f"€{toplam_satis_eur:,.2f}"
-            })
-
-        df_teklif = pd.DataFrame(table_rows)
-        st.dataframe(df_teklif, use_container_width=True, hide_index=True)
-
-        st.markdown("---")
-        st.markdown("#### 3. Hazır Teklif Mektubu Metni (Kopyalanabilir)")
-        
-        letter_lines = [
-            f"SAYIN {td['firma_adi'].upper()},",
-            "",
-            f"Talep etmiş olduğunuz '{td['urun_adi']}' ambalaj/matbaa işine ait teknik imalat ve fiyat teklifimiz aşağıda bilginize sunulmuştur.",
-            "",
-            "ÜRÜN TEKNİK ŞARTNAMESİ:",
-            f"• Ürün Tipi / Adı: {td['urun_tipi']} / {td['urun_adi']}",
-            f"• Ebat: {td['ebat_en']} mm x {td['ebat_boy']} mm x {td['ebat_yukseklik']} mm",
-            f"• Baskı CMYK: {td['cmyk_secim']} | Pantone: {td['pantone_sayisi']}",
-            f"• Yüzey Kaplama: {td['laminasyon']} | Özel İşlem: {td['ozel_baski']}",
-            f"• Baskı Sonrasi: {td['baski_sonrasi']}",
-        ]
-        
-        if td.get('ozel_istekler'):
-            letter_lines.append(f"• Özel İstekler: {td['ozel_istekler']}")
-            
-        letter_lines.extend([
-            "",
-            "FİYAT VE ADET SEÇENEKLERİ:"
-        ])
-        
-        for alt in td['alternatifler']:
-            res = alt['res']
-            net_adet = alt['adet']
-            net_maliyet = res['toplam_uretim_maliyeti']
-            kar_tutari = net_maliyet * (kar_orani / 100.0)
-            toplam_satis_tl = net_maliyet + kar_tutari
-            birim_satis_tl = toplam_satis_tl / net_adet if net_adet > 0 else 0
-            letter_lines.append(f"- Alternatif {alt['kod']} | {net_adet:,} Adet ({alt['gramaj']} gr {alt['kagit']}): Birim Fiyat: ₺{birim_satis_tl:,.4f} + KDV | Toplam: ₺{toplam_satis_tl:,.2f} + KDV")
-
-        letter_lines.extend([
-            "",
-            "GENEL ŞARTLAR:",
-            "1. Teklifimiz 15 (on beş) gün süreyle geçerlidir.",
-            "2. Fiyatlarımıza KDV dahil değildir.",
-            "3. Teslimat süresi onaylanan grafik baskı onayı sonrası 7-10 iş günüdür.",
-            "",
-            "Bilgilerinize arz eder, hayırlı işler dileriz.",
-            "Saygılarımızla,",
-            "Matbaa & Ambalaj Üretim Yönetimi"
-        ])
-
-        letter_text = "\n".join(letter_lines)
-        st.text_area("Yazışmalarınız için Teklif Mektubu", value=letter_text, height=350)
+                    "</div>", unsafe
