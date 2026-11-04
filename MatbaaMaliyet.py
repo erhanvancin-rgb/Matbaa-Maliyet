@@ -3,8 +3,55 @@ import xml.etree.ElementTree as ET
 import urllib.request
 import math
 import pandas as pd
+import json
+import os
 
 st.set_page_config(page_title="Matbaa ve Ambalaj Maliyet & Teklif Sistemi", layout="wide")
+
+# --- 0. KALICI JSON PARAMETRE YÖNETİMİ ---
+PARAM_FILE = "matbaa_parametreleri.json"
+
+default_params = {
+    'bristol': 825.0, 'krome': 40000.0, 'kuse': 850.0, 'hamur': 1200.0,
+    'b_3550_cmyk': 2400.0, 'b_3550_pantone': 1200.0, 'b_3550_tiraj': 500.0,
+    'b_5070_cmyk': 3500.0, 'b_5070_pantone': 1750.0, 'b_5070_tiraj': 800.0,
+    'b_70100_cmyk': 5000.0, 'b_70100_pantone': 1750.0, 'b_70100_tiraj': 1400.0,
+    'disp_5070': 1500.0, 'disp_5070_tiraj': 800.0,
+    'disp_70100': 2000.0, 'disp_70100_tiraj': 1000.0,
+    'mat_sel': 4.70, 'par_sel': 4.50,
+    'lokal_5070': 1500.0, 'lokal_5070_tiraj': 1.5,
+    'lokal_70100': 1800.0, 'lokal_70100_tiraj': 1.5,
+    'kab_5070': 1600.0, 'kab_5070_tiraj': 1.6,
+    'kab_70100': 1900.0, 'kab_70100_tiraj': 1.9,
+    'kazanli': 1800.0, 'kazanli_tiraj': 0.75,
+    'pedal': 2500.0, 'pedal_tiraj': 1.0,
+    'bobst': 3000.0, 'bobst_tiraj': 1.5,
+    'omega_tek': 2000.0, 'omega_tek_tiraj': 0.2,
+    'omega_dip': 2500.0, 'omega_dip_tiraj': 0.25
+}
+
+def parametreleri_yukle():
+    if os.path.exists(PARAM_FILE):
+        try:
+            with open(PARAM_FILE, "r", encoding="utf-8") as f:
+                kayitli = json.load(f)
+                for k, v in default_params.items():
+                    if k not in kayitli:
+                        kayitli[k] = v
+                return kayitli
+        except Exception:
+            return default_params.copy()
+    return default_params.copy()
+
+def parametreleri_kaydet(params_dict):
+    try:
+        with open(PARAM_FILE, "w", encoding="utf-8") as f:
+            json.dump(params_dict, f, ensure_ascii=False, indent=4)
+    except Exception:
+        pass
+
+if 'params' not in st.session_state:
+    st.session_state.params = parametreleri_yukle()
 
 # --- 1. TCMB ANLIK EFEKTİF SATIŞ KURLARINI ÇEKME ---
 @st.cache_data(ttl=3600)
@@ -30,38 +77,12 @@ def tcmb_kurlarini_getir():
 
 canli_usd, canli_eur = tcmb_kurlarini_getir()
 
-# --- 2. OTURUM DURUMU VE EXCEL PARAMETRELERİ ---
+# --- 2. OTURUM DURUMU ---
 if 'page' not in st.session_state:
     st.session_state.page = 'home'
 
 if 'teklif_data' not in st.session_state:
     st.session_state.teklif_data = None
-
-default_params = {
-    'bristol': 825.0, 'krome': 40000.0, 'kuse': 850.0, 'hamur': 1200.0,
-    'b_3550_cmyk': 1800.0, 'b_3550_pantone': 900.0, 'b_3550_tiraj': 400.0,
-    'b_5070_cmyk': 3500.0, 'b_5070_pantone': 1750.0, 'b_5070_tiraj': 800.0,
-    'b_70100_cmyk': 5000.0, 'b_70100_pantone': 1750.0, 'b_70100_tiraj': 1400.0,
-    'disp_5070': 1500.0, 'disp_5070_tiraj': 800.0,
-    'disp_70100': 2000.0, 'disp_70100_tiraj': 1000.0,
-    'mat_sel': 4.70, 'par_sel': 4.50,
-    'lokal_5070': 1500.0, 'lokal_5070_tiraj': 1.5,
-    'lokal_70100': 1800.0, 'lokal_70100_tiraj': 1.5,
-    'kab_5070': 1600.0, 'kab_5070_tiraj': 1.6,
-    'kab_70100': 1900.0, 'kab_70100_tiraj': 1.9,
-    'kazanli': 1800.0, 'kazanli_tiraj': 0.75,
-    'pedal': 2500.0, 'pedal_tiraj': 1.0,
-    'bobst': 3000.0, 'bobst_tiraj': 1.5,
-    'omega_tek': 2000.0, 'omega_tek_tiraj': 0.2,
-    'omega_dip': 2500.0, 'omega_dip_tiraj': 0.25
-}
-
-if 'params' not in st.session_state:
-    st.session_state.params = default_params
-else:
-    for k, v in default_params.items():
-        if k not in st.session_state.params:
-            st.session_state.params[k] = v
 
 def go_page(page_name):
     st.session_state.page = page_name
@@ -115,11 +136,11 @@ if st.session_state.page == 'home':
             st.rerun()
 
 # ==========================================
-# MENÜ 2: PARAMETRELER SAYFASI
+# MENÜ 2: PARAMETRELER SAYFASI (KALICI JSON)
 # ==========================================
 elif st.session_state.page == 'params':
     st.subheader("Matbaa Maliyet Parametreleri Fiyat Listesi (Excel 37 Parametre Tam Listesi)")
-    st.caption("Parametre yönetimi: Sol tarafta Kağıt, Baskı ve Dispersiyon Lak; Sağ tarafta diğer yüzey ve kesim işlemleri yer almaktadır.")
+    st.caption("Değiştirdiğiniz tüm fiyatlar otomatik olarak kalıcı dosyaya kaydedilir ve sıfırlanmaz.")
     
     col1, col2 = st.columns(2)
     
@@ -192,8 +213,12 @@ elif st.session_state.page == 'params':
         st.session_state.params['omega_dip'] = st.number_input("Omega Dip Yapıştırma Hazırlık (₺)", value=st.session_state.params['omega_dip'], key="p_omd")
         st.session_state.params['omega_dip_tiraj'] = st.number_input("Omega Dip Yapıştırma Tiraj (Adet/₺)", value=st.session_state.params['omega_dip_tiraj'], key="p_omdt")
 
+    # Değişiklikleri otomatik kaydet
+    parametreleri_kaydet(st.session_state.params)
+    st.success("💾 Tüm parametre değişiklikleri kalıcı olarak kaydedildi.")
+
 # ==========================================
-# MENÜ 3: FORM VE HESAPLAMA MODÜLÜ
+# MENÜ 3: FORM VE HESAPLAMA MODÜLÜ (TİRAJ KADEME MANTIĞI)
 # ==========================================
 elif st.session_state.page == 'calc':
     def hesapla_maliyet_detayli(
@@ -218,7 +243,10 @@ elif st.session_state.page == 'calc':
         if "70x100" in basilacak_ebat:
             tab_en, tab_boy = 0.70, 1.00
             ebat_kodu = "70100"
-        elif "50x70" in basilacak_ebat or "32x45" in basilacak_ebat:
+        elif "50x70" in basilacak_ebat:
+            tab_en, tab_boy = 0.50, 0.70
+            ebat_kodu = "5070"
+        elif "35x50" in basilacak_ebat or "32x45" in basilacak_ebat:
             tab_en, tab_boy = 0.32, 0.45
             ebat_kodu = "3550"
         elif "64x90" in basilacak_ebat:
@@ -259,22 +287,28 @@ elif st.session_state.page == 'calc':
 
         revolta_uygun = kagit_cinsi in ["Kuşe Kağıt", "1. Hamur Kağıt"]
         
-        b_cmyk_base = params.get(f"b_{ebat_kodu}_cmyk", 3500.0)
-        b_pantone_base = params.get(f"b_{ebat_kodu}_pantone", 1750.0)
-        b_tiraj_rate = params.get(f"b_{ebat_kodu}_tiraj", 800.0)
+        # --- DOĞRU TİRAJ KADEME HESAPLAMA FORMÜLÜ ---
+        # İlk 2.000 tabaka baz hazırlık ücreti, aşan kısım 1.000 adetlik tiraj birim fiyatı üzerinden hesaplanır.
+        b_cmyk_base = params.get(f"b_{ebat_kodu}_cmyk", 2400.0)
+        b_pantone_base = params.get(f"b_{ebat_kodu}_pantone", 1200.0)
+        b_tiraj_rate = params.get(f"b_{ebat_kodu}_tiraj", 500.0)
 
         baski_vurus = tabaka_adeti
         if baski_yuzu in ["Çift Yüz", "Ön ve Arka Baskı"]:
             if revolta_uygun:
                 baski_vurus = tabaka_adeti * 2
-                baski_maliyeti = b_cmyk_base + max(0, (baski_vurus - 2000) / 1000.0) * b_tiraj_rate
+                fazla_vurus = max(0, baski_vurus - 2000)
+                baski_maliyeti = b_cmyk_base + (fazla_vurus / 1000.0) * b_tiraj_rate
             else:
-                baski_maliyeti = (b_cmyk_base + max(0, (baski_vurus - 2000) / 1000.0) * b_tiraj_rate) * 1.8
+                fazla_vurus = max(0, baski_vurus - 2000)
+                baski_maliyeti = (b_cmyk_base + (fazla_vurus / 1000.0) * b_tiraj_rate) * 1.8
         elif baski_yuzu == "Revolta Baskı":
             baski_vurus = tabaka_adeti * 2
-            baski_maliyeti = b_cmyk_base + max(0, (baski_vurus - 2000) / 1000.0) * b_tiraj_rate
+            fazla_vurus = max(0, baski_vurus - 2000)
+            baski_maliyeti = b_cmyk_base + (fazla_vurus / 1000.0) * b_tiraj_rate
         elif baski_yuzu in ["Tek Yüz", "Tek Yüz Baskı"]:
-            baski_maliyeti = b_cmyk_base + max(0, (baski_vurus - 2000) / 1000.0) * b_tiraj_rate
+            fazla_vurus = max(0, baski_vurus - 2000)
+            baski_maliyeti = b_cmyk_base + (fazla_vurus / 1000.0) * b_tiraj_rate
         else:
             baski_maliyeti = 0.0
 
@@ -381,7 +415,7 @@ elif st.session_state.page == 'calc':
         with cb_g:
             gramaj_b = st.number_input("Gramaj B (gr/m² - 2. İhtimal Opsiyonel)", value=350, step=10, min_value=50, key="gramaj_b")
         with cb_c:
-            kagit_cinsi_b = st.selectbox("Kağıt Cinsi B (2. İhtimal Opsiyonel)", ["Yok / Kullanma", "Amerikan Bristol", "Krome Karton", "Kuşe Kağıt", "1. Hamur Kağıt"], index=0, key="kagit_cinsi_b")
+            kagit_cinsi_b = st.selectbox("Kağıt Cinsi B (2. İhtimal Opsiyonel)", ["Yok / Kullanma", "Amerikan Bristol", "Krome Karton", "Kuşe Kağıt", "1. Hamur Kağıt"], key="kagit_cinsi_b")
 
     ikinci_kagit_var = kagit_cinsi_b != "Yok / Kullanma"
 
