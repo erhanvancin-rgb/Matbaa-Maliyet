@@ -239,53 +239,64 @@ elif st.session_state.page == 'calc':
 
         brut_adet = int(math.ceil(net_adet * (1 + (fire_pct / 100.0))))
         
+        # Makine ebadı ve makas payı (mm cinsinden)
         if "32x45" in basilacak_ebat or "35x50" in basilacak_ebat:
-            tab_en, tab_boy = 0.32, 0.45
+            tab_en_mm, tab_boy_mm = 350.0, 500.0
+            makas_payi_mm = 10.0
             ebat_kodu = "3550"
         elif "50x70" in basilacak_ebat or "45x64" in basilacak_ebat:
-            tab_en, tab_boy = 0.45, 0.64
+            tab_en_mm, tab_boy_mm = 450.0, 640.0
+            makas_payi_mm = 12.0
             ebat_kodu = "5070"
         elif "70x100" in basilacak_ebat or "64x90" in basilacak_ebat:
-            tab_en, tab_boy = 0.64, 0.90
+            tab_en_mm, tab_boy_mm = 640.0, 900.0
+            makas_payi_mm = 15.0
             ebat_kodu = "70100"
         else:
-            tab_en, tab_boy = 0.32, 0.45
+            tab_en_mm, tab_boy_mm = 350.0, 500.0
+            makas_payi_mm = 10.0
             ebat_kodu = "3550"
 
-        # --- PROFESYONEL BLEED VE MAKAS PAYI (GRIPPER) MATRİSİ ---
-        # Ürün ölçülerine +2.5 mm bleed (toplamda en/boy başına +5 mm) eklenir
-        urun_en_bleed = (ebat_en + 5.0) / 1000.0
-        urun_boy_bleed = (ebat_boy + 5.0) / 1000.0
+        tab_en = tab_en_mm / 1000.0
+        tab_boy = tab_boy_mm / 1000.0
 
-        # Kısa kenara 15 mm (0.015 m) makas payı eklenerek sığma kontrolü yapılır
-        makas_payi_m = 0.015
-        
-        # 2 Yönlü sığdırma ve makas payı kontrolü
-        # Alternatif 1: tab_en ve tab_boy
-        fit1_x = math.floor(tab_en / urun_en_bleed)
-        fit1_y = math.floor((tab_boy - makas_payi_m) / urun_boy_bleed)
-        m1 = max(0, fit1_x * fit1_y)
+        # --- YENİ BLEED (2mm) VE MAKAS PAYI GEOMETRİSİ ---
+        # Ürün ölçülerine her kenara 2 mm (toplam en/boy başına +4 mm) bleed eklenir
+        urun_en_bleed = ebat_en + 4.0
+        urun_boy_bleed = ebat_boy + 4.0
 
-        fit2_x = math.floor(tab_en / urun_boy_bleed)
-        fit2_y = math.floor((tab_boy - makas_payi_m) / urun_en_bleed)
-        m2 = max(0, fit2_x * fit2_y)
+        # Makas payı kağıdın kısa kenarından düşülür
+        # 4 olası yerleşim kombinasyonu test edilir
+        def get_montaj(w1, h1, w2, h2, max_w, max_h, makas):
+            # Kombinasyon 1: w2 yatay, h2 dikey (Kısa kenar h1 veya w1 hangisi makas alacak)
+            # Kısa kenar sınırından makas payı düşülür
+            s1_x = math.floor(max_w / w1)
+            s1_y = math.floor((max_h - makas) / h1)
+            m1 = max(0, s1_x * s1_y)
 
-        fit3_x = math.floor((tab_en - makas_payi_m) / urun_en_bleed)
-        fit3_y = math.floor(tab_boy / urun_boy_bleed)
-        m3 = max(0, fit3_x * fit3_y)
+            s2_x = math.floor((max_w - makas) / w1)
+            s2_y = math.floor(max_h / h1)
+            m2 = max(0, s2_x * s2_y)
 
-        fit4_x = math.floor((tab_en - makas_payi_m) / urun_boy_bleed)
-        fit4_y = math.floor(tab_boy / urun_en_bleed)
-        m4 = max(0, fit4_x * fit4_y)
+            # Döndürülmüş (w2, h2 yer değiştirmiş)
+            s3_x = math.floor(max_w / h1)
+            s3_y = math.floor((max_h - makas) / w1)
+            m3 = max(0, s3_x * s3_y)
 
-        montaj_adedi = max(1, m1, m2, m3, m4)
+            s4_x = math.floor((max_w - makas) / h1)
+            s4_y = math.floor(max_h / w1)
+            m4 = max(0, s4_x * s4_y)
+
+            return max(m1, m2, m3, m4)
+
+        montaj_adedi = max(1, get_montaj(urun_en_bleed, urun_boy_bleed, urun_boy_bleed, urun_en_bleed, tab_en_mm, tab_boy_mm, makas_payi_mm))
 
         revolta_uygun_kagit = kagit_cinsi in ["Kuşe Kağıt", "1. Hamur Kağıt"]
         
         # --- REVOLTA KURALI KONTROLÜ ---
         # Revolta sadece Kuşe/Hamur kağıtta ve imalat adedi çift sayı ise uygulanabilir!
         gercek_baski_yuzu = baski_yuzu
-        if baski_yuzu in ["Çift Yüz", "Ön ve Arka Baskı", "Revolta Baskı"]:
+        if baski_yuzu in ["Çift Yüz", "Ön dan Arka Baskı", "Revolta Baskı", "Çift Yüz"]:
             if revolta_uygun_kagit and (montaj_adedi % 2 == 0):
                 gercek_baski_yuzu = "Revolta Baskı"
             else:
@@ -413,19 +424,19 @@ elif st.session_state.page == 'calc':
 
     col_r2_1, col_r2_2, col_r2_3 = st.columns(3)
     with col_r2_1:
-        net_a = st.number_input("Ürün Adedi A (Axxx)", value=1000, step=500, key="net_a")
+        net_a = st.number_input("Ürün Adedi A (Axxx)", value=10000, step=1000, key="net_a")
     with col_r2_2:
-        net_b = st.number_input("Ürün Adedi B (Bxxx)", value=3000, step=500, key="net_b")
+        net_b = st.number_input("Ürün Adedi B (Bxxx)", value=20000, step=1000, key="net_b")
     with col_r2_3:
-        net_c = st.number_input("Ürün Adedi C (Cxxx)", value=5000, step=500, key="net_c")
+        net_c = st.number_input("Ürün Adedi C (Cxxx)", value=50000, step=1000, key="net_c")
 
     col_ka_head, col_kb_head = st.columns(2)
     with col_ka_head:
         ca_g, ca_c = st.columns(2)
         with ca_g:
-            gramaj_a = st.number_input("Gramaj A (gr/m²)", value=300, step=10, min_value=50, key="gramaj_a")
+            gramaj_a = st.number_input("Gramaj A (gr/m²)", value=170, step=10, min_value=50, key="gramaj_a")
         with ca_c:
-            kagit_cinsi_a = st.selectbox("Kağıt Cinsi A", ["Amerikan Bristol", "Krome Karton", "Kuşe Kağıt", "1. Hamur Kağıt"], key="kagit_cinsi_a")
+            kagit_cinsi_a = st.selectbox("Kağıt Cinsi A", ["Kuşe Kağıt", "Amerikan Bristol", "Krome Karton", "1. Hamur Kağıt"], key="kagit_cinsi_a")
             
     with col_kb_head:
         cb_g, cb_c = st.columns(2)
@@ -438,13 +449,13 @@ elif st.session_state.page == 'calc':
 
     col_ebat1, col_ebat2, col_ebat3, col_baski1, col_baski2 = st.columns(5)
     with col_ebat1:
-        ebat_en = st.number_input("En (mm)", value=210, key="ebat_en")
+        ebat_en = st.number_input("En (mm)", value=240, key="ebat_en")
     with col_ebat2:
-        ebat_boy = st.number_input("Boy (mm)", value=297, key="ebat_boy")
+        ebat_boy = st.number_input("Boy (mm)", value=110, key="ebat_boy")
     with col_ebat3:
         ebat_yukseklik = st.number_input("Yükseklik (mm)", value=0, key="ebat_yukseklik")
     with col_baski1:
-        cmyk_secim = st.selectbox("Baskı CMYK", ["Tek Yüz", "Çift Yüz", "CMYK Baskı yok"], key="cmyk_secim")
+        cmyk_secim = st.selectbox("Baskı CMYK", ["Çift Yüz", "Tek Yüz", "CMYK Baskı yok"], key="cmyk_secim")
     with col_baski2:
         pantone_secenekleri = ["Yok", "1 renk zemin", "2 renk zemin", "3 renk zemin", "4 renk zemin", "1 renk lokal", "2 renk lokal", "3 renk lokal", "4 renk lokal"]
         pantone_sayisi = st.selectbox("Baskı Pantone renk sayısı", pantone_secenekleri, key="pantone_sayisi")
@@ -493,9 +504,9 @@ elif st.session_state.page == 'calc':
 
     plan_params = []
     
-    plan_params.append({**en_ekonomik_makineyi_bul(net_a, gramaj_a, kagit_cinsi_a), 'kod': 'A1'})
-    plan_params.append({**en_ekonomik_makineyi_bul(net_b, gramaj_a, kagit_cinsi_a), 'kod': 'B1'})
-    plan_params.append({**en_ekonomik_makineyi_bul(net_c, gramaj_a, kagit_cinsi_a), 'kod': 'C1'})
+    plan_params.append({**en_ekonomik_makineyi_bul(net_a, gramaj_a, kagit_cinsi_a), 'kod': 'A'})
+    plan_params.append({**en_ekonomik_makineyi_bul(net_b, gramaj_a, kagit_cinsi_a), 'kod': 'B'})
+    plan_params.append({**en_ekonomik_makineyi_bul(net_c, gramaj_a, kagit_cinsi_a), 'kod': 'C'})
 
     if ikinci_kagit_var:
         plan_params.append({**en_ekonomik_makineyi_bul(net_a, gramaj_b, kagit_cinsi_b), 'kod': 'A2'})
@@ -526,7 +537,7 @@ elif st.session_state.page == 'calc':
         "alternatifler": teklif_alternatifleri
     }
 
-    st.markdown("### 📊 ÜRETİM VE PLANLAMA ÖZETİ (BLEED & MAKAS PAYI KONTROLLÜ)")
+    st.markdown("### 📊 ÜRETİM VE PLANLAMA ÖZETİ (BLEED 2MM & MAKAS PAYI UYUMLU)")
 
     def plan_kartini_yazdir(p):
         r = p['res']
@@ -551,13 +562,13 @@ elif st.session_state.page == 'calc':
         st.markdown("#### 🔹 Kağıt A Alternatifleri")
         col_p1, col_p2, col_p3 = st.columns(3)
         with col_p1: 
-            st.markdown("##### Alternatif A1")
+            st.markdown("##### Alternatif A")
             plan_kartini_yazdir(teklif_alternatifleri[0])
         with col_p2: 
-            st.markdown("##### Alternatif B1")
+            st.markdown("##### Alternatif B")
             plan_kartini_yazdir(teklif_alternatifleri[1])
         with col_p3: 
-            st.markdown("##### Alternatif C1")
+            st.markdown("##### Alternatif C")
             plan_kartini_yazdir(teklif_alternatifleri[2])
 
         st.markdown("---")
@@ -616,7 +627,7 @@ elif st.session_state.page == 'teklif':
             "<div style='background-color: #f8f9fa; padding: 20px; border-radius: 10px; border-left: 5px solid #1F4E78;'>"
             "<h3 style='margin: 0; color: #1F4E78;'>OFFICIAL PRICE QUOTATION / FİYAT TEKLİF MEKTUBU</h3>"
             f"<p style='margin: 5px 0 0 0;'><strong>Sayın:</strong> {td['firma_adi']}</p>"
-            "<p style='margin: 2px 0 0 0;'><strong>Tarih:</strong> 03 Kasım 2026 | <strong>Teklif No:</strong> OFF-2026-8492</p>"
+            "<p style='margin: 2px 0 0 0;'><strong>Tarih:</strong> 04 Kasım 2026 | <strong>Teklif No:</strong> OFF-2026-8492</p>"
             "</div>", 
             unsafe_allow_html=True
         )
