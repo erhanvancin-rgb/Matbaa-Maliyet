@@ -252,13 +252,44 @@ elif st.session_state.page == 'calc':
             tab_en, tab_boy = 0.32, 0.45
             ebat_kodu = "3550"
 
-        # --- DİNAMİK MONTAJ (SIĞDIRMA) HESABI ---
-        en_m = ebat_en / 1000.0
-        boy_m = ebat_boy / 1000.0
+        # --- PROFESYONEL BLEED VE MAKAS PAYI (GRIPPER) MATRİSİ ---
+        # Ürün ölçülerine +2.5 mm bleed (toplamda en/boy başına +5 mm) eklenir
+        urun_en_bleed = (ebat_en + 5.0) / 1000.0
+        urun_boy_bleed = (ebat_boy + 5.0) / 1000.0
+
+        # Kısa kenara 15 mm (0.015 m) makas payı eklenerek sığma kontrolü yapılır
+        makas_payi_m = 0.015
         
-        fit_h = math.floor(tab_en / en_m) * math.floor(tab_boy / boy_m)
-        fit_v = math.floor(tab_en / boy_m) * math.floor(tab_boy / en_m)
-        montaj_adedi = max(1, max(fit_h, fit_v))
+        # 2 Yönlü sığdırma ve makas payı kontrolü
+        # Alternatif 1: tab_en ve tab_boy
+        fit1_x = math.floor(tab_en / urun_en_bleed)
+        fit1_y = math.floor((tab_boy - makas_payi_m) / urun_boy_bleed)
+        m1 = max(0, fit1_x * fit1_y)
+
+        fit2_x = math.floor(tab_en / urun_boy_bleed)
+        fit2_y = math.floor((tab_boy - makas_payi_m) / urun_en_bleed)
+        m2 = max(0, fit2_x * fit2_y)
+
+        fit3_x = math.floor((tab_en - makas_payi_m) / urun_en_bleed)
+        fit3_y = math.floor(tab_boy / urun_boy_bleed)
+        m3 = max(0, fit3_x * fit3_y)
+
+        fit4_x = math.floor((tab_en - makas_payi_m) / urun_boy_bleed)
+        fit4_y = math.floor(tab_boy / urun_en_bleed)
+        m4 = max(0, fit4_x * fit4_y)
+
+        montaj_adedi = max(1, m1, m2, m3, m4)
+
+        revolta_uygun_kagit = kagit_cinsi in ["Kuşe Kağıt", "1. Hamur Kağıt"]
+        
+        # --- REVOLTA KURALI KONTROLÜ ---
+        # Revolta sadece Kuşe/Hamur kağıtta ve imalat adedi çift sayı ise uygulanabilir!
+        gercek_baski_yuzu = baski_yuzu
+        if baski_yuzu in ["Çift Yüz", "Ön ve Arka Baskı", "Revolta Baskı"]:
+            if revolta_uygun_kagit and (montaj_adedi % 2 == 0):
+                gercek_baski_yuzu = "Revolta Baskı"
+            else:
+                gercek_baski_yuzu = "Çift Yüz (Normal)"
 
         tabaka_adeti = math.ceil(brut_adet / montaj_adedi)
         if tabaka_adeti < 100:
@@ -280,26 +311,19 @@ elif st.session_state.page == 'calc':
 
         kagit_maliyeti = (kg_kagit / 1000.0) * ton_fiyat_tl
 
-        revolta_uygun = kagit_cinsi in ["Kuşe Kağıt", "1. Hamur Kağıt"]
-        
         b_cmyk_base = params.get(f"b_{ebat_kodu}_cmyk", 2400.0)
         b_pantone_base = params.get(f"b_{ebat_kodu}_pantone", 1200.0)
         b_tiraj_rate = params.get(f"b_{ebat_kodu}_tiraj", 500.0)
 
         baski_vurus = tabaka_adeti
-        if baski_yuzu in ["Çift Yüz", "Ön ve Arka Baskı"]:
-            if revolta_uygun:
-                baski_vurus = tabaka_adeti * 2
-                fazla_vurus = max(0, baski_vurus - 2000)
-                baski_maliyeti = b_cmyk_base + (fazla_vurus / 1000.0) * b_tiraj_rate
-            else:
-                fazla_vurus = max(0, baski_vurus - 2000)
-                baski_maliyeti = (b_cmyk_base + (fazla_vurus / 1000.0) * b_tiraj_rate) * 1.8
-        elif baski_yuzu == "Revolta Baskı":
+        if gercek_baski_yuzu == "Revolta Baskı":
             baski_vurus = tabaka_adeti * 2
             fazla_vurus = max(0, baski_vurus - 2000)
             baski_maliyeti = b_cmyk_base + (fazla_vurus / 1000.0) * b_tiraj_rate
-        elif baski_yuzu in ["Tek Yüz", "Tek Yüz Baskı"]:
+        elif gercek_baski_yuzu in ["Çift Yüz", "Ön ve Arka Baskı", "Çift Yüz (Normal)"]:
+            fazla_vurus = max(0, baski_vurus - 2000)
+            baski_maliyeti = (b_cmyk_base + (fazla_vurus / 1000.0) * b_tiraj_rate) * 1.8
+        elif gercek_baski_yuzu in ["Tek Yüz", "Tek Yüz Baskı"]:
             fazla_vurus = max(0, baski_vurus - 2000)
             baski_maliyeti = b_cmyk_base + (fazla_vurus / 1000.0) * b_tiraj_rate
         else:
@@ -370,7 +394,7 @@ elif st.session_state.page == 'calc':
             "yuzey_lak_toplam": yuzey_lak_toplam,
             "kesim_maliyeti": kesim_maliyeti,
             "toplam_uretim_maliyeti": toplam_uretim_maliyeti,
-            "revolta_uygun": revolta_uygun
+            "gercek_baski_yuzu": gercek_baski_yuzu
         }
 
     st.subheader("📋 Ürün Tanımlama & Maliyet Hesaplama Formu")
@@ -450,14 +474,12 @@ elif st.session_state.page == 'calc':
         en_dusuk_maliyet = float('inf')
 
         for ebat in aday_ebatlar:
-            # Her ebat için geçici maliyet hesapla
             res = hesapla_maliyet_detayli(
                 adet, gramaj, kagit, cmyk_secim, pantone_sayisi, 
                 laminasyon, ozel_baski_1, ozel_baski_2, baski_sonrasi, ebat, 
                 0.0, ebat_en, ebat_boy, ebat_yukseklik
             )
             
-            # Fire oranını belirle
             if adet <= 1500: fire = 10.0
             elif adet <= 3000: fire = 7.0
             else: fire = 5.0
@@ -471,7 +493,6 @@ elif st.session_state.page == 'calc':
 
     plan_params = []
     
-    # Her bir tiraj kademesi için arkada 3 makineyi test et ve en ucuzunu seç
     plan_params.append({**en_ekonomik_makineyi_bul(net_a, gramaj_a, kagit_cinsi_a), 'kod': 'A1'})
     plan_params.append({**en_ekonomik_makineyi_bul(net_b, gramaj_a, kagit_cinsi_a), 'kod': 'B1'})
     plan_params.append({**en_ekonomik_makineyi_bul(net_c, gramaj_a, kagit_cinsi_a), 'kod': 'C1'})
@@ -505,7 +526,7 @@ elif st.session_state.page == 'calc':
         "alternatifler": teklif_alternatifleri
     }
 
-    st.markdown("### 📊 ÜRETİM VE PLANLAMA ÖZETİ (EN EKONOMİK MAKİNE SEÇİMİ)")
+    st.markdown("### 📊 ÜRETİM VE PLANLAMA ÖZETİ (BLEED & MAKAS PAYI KONTROLLÜ)")
 
     def plan_kartini_yazdir(p):
         r = p['res']
@@ -520,7 +541,7 @@ elif st.session_state.page == 'calc':
             {"Parametre / Kriter": "Basılacak Kağıdın Ebadı", "Değer": p['ebat']},
             {"Parametre / Kriter": "Kağıt Kilogram (kg)", "Değer": f"{r['kg_kagit']} kg"},
             {"Parametre / Kriter": "Baskı Adedi Ön Ve Arka", "Değer": f"{r['tabaka_adeti']:,} tabaka"},
-            {"Parametre / Kriter": "Baskı Metodu", "Değer": "Revolta" if r['revolta_uygun'] and cmyk_secim == "Çift Yüz" else "Standart Ofset"},
+            {"Parametre / Kriter": "Baskı Metodu", "Değer": r['gercek_baski_yuzu']},
             {"Parametre / Kriter": "Kaç M2", "Değer": f"{r['toplam_m2']:,.2f} m²"}
         ])
         
@@ -564,7 +585,7 @@ elif st.session_state.page == 'calc':
             plan_kartini_yazdir(teklif_alternatifleri[2])
 
     st.markdown("---")
-    st.markdown("### 🛠️ MATBAA PLANLAMA DETAYLARI (OTOMATİK EN UCUZ MAKİNE)")
+    st.markdown("### 🛠️ MATBAA PLANLAMA DETAYLARI")
     
     if ikinci_kagit_var:
         st.info("💡 2. Kağıt seçimi aktif olduğu için sistem her tirajda 35x50, 50x70 ve 70x100 makinelerini karşılaştırıp en ekonomik olanı seçerek 3x2 blok halinde sunmaktadır.")
@@ -584,7 +605,7 @@ elif st.session_state.page == 'teklif':
     
     if st.session_state.teklif_data is None:
         st.warning("⚠️ Henüz bir hesaplama yapılmadı. Lütfen önce 'Fiyat Çıkart' modülünden ürün hesaplamasını gerçekleştirin.")
-        if st.button("Forma Dön dan Hesapla", key="teklif_to_calc"):
+        if st.button("Forma Dön", key="teklif_to_calc"):
             go_page('calc')
             st.rerun()
     else:
