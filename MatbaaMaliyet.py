@@ -6,7 +6,7 @@ import pandas as pd
 import json
 import os
 
-st.set_page_config(page_title="Matbaa and Ambalaj Maliyet & Teklif Sistemi", layout="wide")
+st.set_page_config(page_title="Matbaa ve Ambalaj Maliyet & Teklif Sistemi", layout="wide")
 
 # --- 0. KALICI JSON PARAMETRE YÖNETİMİ ---
 PARAM_FILE = "matbaa_parametreleri.json"
@@ -366,7 +366,7 @@ elif st.session_state.page == 'calc':
     with col_r1_1:
         firma_adi = st.text_input("Firma Adı", "Erhan Ticaret")
     with col_r1_2:
-        urun_adi = st.text_input("Ürün Adı", "Lüks Ambalaj Kutusu")
+        urun_adi = st.text_input("Ürün Adı", "Kilitli/Yapıştırmalı Ambalaj Kutusu")
     with col_r1_3:
         urun_tipleri = ["Föy", "Tek Kırımlı Broşür", "İki Kırımlı Broşür", "Kartonet", "Standart Kutu", "Dip Kilitli Kutu", "Dip Kilit Yapıştırmalı Kutu", "Yan Yapıştırmalı Kutu", "Sıvamalı Kutu", "Etiket", "Prospektüs"]
         urun_tipi = st.selectbox("Ürün Tipi", urun_tipleri)
@@ -398,11 +398,11 @@ elif st.session_state.page == 'calc':
 
     col_ebat1, col_ebat2, col_ebat3, col_baski1, col_baski2 = st.columns(5)
     with col_ebat1:
-        ebat_en = st.number_input("En (mm) [A]", value=340, key="ebat_en")
+        ebat_en = st.number_input("En (mm) [A]", value=150, key="ebat_en")
     with col_ebat2:
-        ebat_boy = st.number_input("Boy (mm) [B]", value=340, key="ebat_boy")
+        ebat_boy = st.number_input("Boy (mm) [B]", value=240, key="ebat_boy")
     with col_ebat3:
-        ebat_yukseklik = st.number_input("Yükseklik (mm) [C]", value=120, key="ebat_yukseklik")
+        ebat_yukseklik = st.number_input("Yükseklik (mm) [C]", value=30, key="ebat_yukseklik")
     with col_baski1:
         cmyk_secim = st.selectbox("Baskı CMYK", ["Çift Yüz", "Tek Yüz", "CMYK Baskı yok"], key="cmyk_secim")
     with col_baski2:
@@ -421,78 +421,92 @@ elif st.session_state.page == 'calc':
         ozel_baski_2 = st.selectbox("Özel Baskılar 2", ozel_baski_2_secenekleri, key="ozel_baski_2")
     with c_bs:
         baski_sonrasi_secenekleri = ["Düz Kesim", "Özel kesim", "Kutu Kesim + Yapıştırma", "Yan Yapıştırmalı Kutu", "Dip Yapıştırmalı Kutu", "Pencereli Kutu Kesim+Yapıştırma"]
-        baski_sonrasi = st.selectbox("Baskı Sonrası", baski_sonrasi_secenekleri, key="baski_sonrasi")
+        baski_sonrasi = st.selectbox("Baskı Sonrasi", baski_sonrasi_secenekleri, key="baski_sonrasi")
 
     ozel_istekler = st.text_input("Özel İstekler", "", placeholder="Özel talepleri buraya yazınız...", key="ozel_istekler")
     st.markdown("---")
 
-    # --- KESİN DOĞRULANMIŞ AÇINIM FORMÜLÜ ---
-    def kutu_acik_ebat_hesapla(en, boy, yukseklik, kutu_tipi):
-        # Açık En = (En * 2) + (Yükseklik * 2) + 15 mm kulak
+    # --- KUTU TİPİNE GÖRE AÇINIM VE BOY FORMÜLLERİ ---
+    def kutu_acik_ebat_hesapla(en, boy, yukseklik, kutu_tipi, s_en=1, s_boy=1):
+        # En (Genişlik) Formülü tüm kutu tiplerinde aynıdır: (En * 2) + (Yükseklik * 2) + 15 mm
         acik_en = (en * 2) + (yukseklik * 2) + 15.0
-        # Açık Boy = Boy + (Yükseklik * 2) + 30 mm kulaklar
-        acik_boy = boy + (yukseklik * 2) + 30.0
+        
+        # Boy (İç İçe Geçmeli / Jigsaw) Formülleri
+        if kutu_tipi in ["Dip Kilitli Kutu", "Dip Kilit Yapıştırmalı Kutu", "Dip Yapıştırmalı Kutu"]:
+            # Eğer sıra sayısı (s_boy) çift veya 4'ün katı ise (2, 4, 8, 12...)
+            if s_boy in [2, 4, 8, 12] or (s_boy % 2 == 0):
+                acik_boy = ((boy + yukseklik + 15.0) + ((yukseklik / 2.0 + 15.0) * 2.0)) * s_boy
+            else:
+                # Tek sıra sayıları için (1, 3, 5, 6, 7, 9, 10, 11...)
+                acik_boy = (((boy + yukseklik + 15.0) + ((yukseklik / 2.0 + 15.0) * 2.0)) * s_boy) + yukseklik + 15.0
+        else:
+            # Standart Kutu Jigsaw Formülü
+            acik_boy = ((boy + yukseklik + 15.0) * s_boy) + ((yukseklik + 15.0) * 2.0)
+            
         return acik_en, acik_boy
 
-    def fiziksel_montaj_bul(tw, th, w, h, makas, kutu_formu):
+    def fiziksel_montaj_bul(tw, th, en, boy, yukseklik, makas, kutu_formu):
         if tw > th:
             tw, th = th, tw 
+            
         best_m = 0
-        if kutu_formu in ["Standart Kutu", "Dip Kilitli Kutu", "Dip Kilit Yapıştırmalı Kutu"]:
-            for (pw, ph) in [(w, h), (h, w)]:
+        base_en = (en * 2) + (yukseklik * 2) + 15.0
+        
+        for s_en in range(1, 10):
+            for s_boy in range(1, 13):
+                item_w = base_en * s_en
+                
+                # Kutu formuna göre boy hesaplama tetikleyicisi
+                if kutu_formu in ["Dip Kilitli Kutu", "Dip Kilit Yapıştırmalı Kutu", "Dip Yapıştırmalı Kutu"]:
+                    if s_boy in [2, 4, 8, 12] or (s_boy % 2 == 0):
+                        item_h = ((boy + yukseklik + 15.0) + ((yukseklik / 2.0 + 15.0) * 2.0)) * s_boy
+                    else:
+                        item_h = (((boy + yukseklik + 15.0) + ((yukseklik / 2.0 + 15.0) * 2.0)) * s_boy) + yukseklik + 15.0
+                else:
+                    item_h = ((boy + yukseklik + 15.0) * s_boy) + ((yukseklik + 15.0) * 2.0)
+                
+                # Tabakaya sığma kontrolü
                 if tw > makas:
-                    s_x = math.floor((tw - makas) / pw)
-                    s_y = math.floor(th / ph)
-                    best_m = max(best_m, s_x * s_y)
+                    if (item_w <= tw - makas) and (item_h <= th):
+                        toplam_adet = s_en * s_boy
+                        if toplam_adet > best_m:
+                            best_m = toplam_adet
+                            
+                    if (item_h <= tw - makas) and (item_w <= th):
+                        toplam_adet = s_en * s_boy
+                        if toplam_adet > best_m:
+                            best_m = toplam_adet
+
                 if th > makas:
-                    s_x2 = math.floor(tw / pw)
-                    s_y2 = math.floor((th - makas) / ph)
-                    best_m = max(best_m, s_x2 * s_y2)
-        else:
-            for (pw, ph) in [(w, h), (h, w)]:
-                if tw > makas:
-                    best_m = max(best_m, math.floor((tw - makas) / pw) * math.floor(th / ph))
-                if th > makas:
-                    best_m = max(best_m, math.floor(tw / pw) * math.floor((th - makas) / ph))
+                    if (item_w <= tw) and (item_h <= th - makas):
+                        toplam_adet = s_en * s_boy
+                        if toplam_adet > best_m:
+                            best_m = toplam_adet
+                            
+                    if (item_h <= tw) and (item_w <= th - makas):
+                        toplam_adet = s_en * s_boy
+                        if toplam_adet > best_m:
+                            best_m = toplam_adet
+
         return best_m
 
     def en_ekonomik_makineyi_bul(adet, gramaj, kagit):
         aday_kagitlar = []
         
-        kutu_w, kutu_h = kutu_acik_ebat_hesapla(ebat_en, ebat_boy, ebat_yukseklik, urun_tipi)
-        w_bleed = kutu_w + 4.0
-        h_bleed = kutu_h + 4.0
-
         if kagit in ["Kuşe Kağıt", "1. Hamur Kağıt"]:
             aday_kagitlar.append(("70x100 cm (70x100 Makine)", 700.0, 1000.0, "70100", 15.0))
             aday_kagitlar.append(("50x70 cm (50x70 Makine)", 500.0, 700.0, "5070", 12.0))
-            aday_kagitlar.append(("33.3x70 cm (50x70 Makine)", 333.0, 700.0, "5070", 12.0))
-            aday_kagitlar.append(("35x65 cm (50x70 Makine)", 350.0, 650.0, "5070", 12.0))
             aday_kagitlar.append(("35x50 cm (35x50 Makine)", 350.0, 500.0, "3550", 10.0))
-            aday_kagitlar.append(("23x50 cm (35x50 Makine)", 230.0, 500.0, "3550", 10.0))
-            aday_kagitlar.append(("25x45 cm (35x50 Makine)", 250.0, 450.0, "3550", 10.0))
-
-            aday_kagitlar.append(("64x90 cm (70x100 Makine)", 640.0, 900.0, "70100", 15.0))
-            aday_kagitlar.append(("45x64 cm (50x70 Makine)", 450.0, 640.0, "5070", 12.0))
-            aday_kagitlar.append(("30x64 cm (50x70 Makine)", 300.0, 640.0, "5070", 12.0))
-            aday_kagitlar.append(("31x59 cm (50x70 Makine)", 310.0, 590.0, "5070", 12.0))
-            aday_kagitlar.append(("32x45 cm (35x50 Makine)", 320.0, 450.0, "3550", 10.0))
-            aday_kagitlar.append(("21.3x45 cm (35x50 Makine)", 213.0, 450.0, "3550", 10.0))
-            aday_kagitlar.append(("22.5x41.5 cm (35x50 Makine)", 225.0, 415.0, "3550", 10.0))
-
-            if gramaj <= 170:
-                aday_kagitlar.append(("57x82 cm (70x100 Makine)", 570.0, 820.0, "70100", 15.0))
-                aday_kagitlar.append(("41x57 cm (50x70 Makine)", 410.0, 570.0, "5070", 12.0))
-                aday_kagitlar.append(("28.5x41 cm (35x50 Makine)", 285.0, 410.0, "3550", 10.0))
+            aday_kagitlar.append(("70x95 cm (70x100 Makine)", 700.0, 950.0, "70100", 15.0))
         else:
             aday_kagitlar.append(("70x100 cm (Standart)", 700.0, 1000.0, "70100", 15.0))
             aday_kagitlar.append(("50x70 cm (Standart)", 500.0, 700.0, "5070", 12.0))
             aday_kagitlar.append(("35x50 cm (Standart)", 350.0, 500.0, "3550", 10.0))
+            aday_kagitlar.append(("70x95 cm (Özel Bobin Kesim)", 700.0, 950.0, "70100", 15.0))
             
-            # Özel Bobin Ebatları (5cm aralıklarla 105 cm'e kadar)
             for w_cm in range(30, 105, 5):
                 for h_cm in range(w_cm, 120, 5):
-                    if (w_cm, h_cm) not in [(35,50), (50,70), (70,100)]:
+                    if (w_cm, h_cm) not in [(35,50), (50,70), (70,100), (70,95)]:
                         if w_cm <= 35 and h_cm <= 50:
                             makine_k, makas_k = "3550", 10.0
                         elif w_cm <= 50 and h_cm <= 70:
@@ -502,20 +516,12 @@ elif st.session_state.page == 'calc':
                         else:
                             continue
                         aday_kagitlar.append((f"{w_cm}x{h_cm} cm (Özel Bobin Kesim)", float(w_cm*10), float(h_cm*10), makine_k, makas_k))
-            
-            # Tam açınıma göre nokta atışı özel bobin ebadı
-            ideal_w_cm = math.ceil((w_bleed) / 10.0) * 10
-            ideal_h_cm = math.ceil((h_bleed) / 10.0) * 10
-            if ideal_w_cm <= 100 and ideal_h_cm <= 100:
-                m_k = "3550" if ideal_w_cm<=35 and ideal_h_cm<=50 else ("5070" if ideal_w_cm<=50 and ideal_h_cm<=70 else "70100")
-                m_s = 10.0 if m_k=="3550" else (12.0 if m_k=="5070" else 15.0)
-                aday_kagitlar.append((f"{ideal_w_cm}x{ideal_h_cm} cm (Özel Bobin Kesim)", float(ideal_w_cm*10), float(ideal_h_cm*10), m_k, m_s))
 
         en_iyi_sonuc = None
         en_dusuk_maliyet = float('inf')
 
         for kagit_adi, tw, th, makine_kodu, makas in aday_kagitlar:
-            montaj = fiziksel_montaj_bul(tw, th, w_bleed, h_bleed, makas, urun_tipi)
+            montaj = fiziksel_montaj_bul(tw, th, ebat_en, ebat_boy, ebat_yukseklik, makas, urun_tipi)
             if montaj <= 0: continue
 
             res = hesapla_maliyet_detayli(
@@ -536,157 +542,4 @@ elif st.session_state.page == 'calc':
                 en_iyi_sonuc = {'adet': adet, 'gramaj': gramaj, 'kagit': kagit, 'fire': fire, 'ebat': kagit_adi, 'res': res}
 
         if en_iyi_sonuc is None:
-            res = hesapla_maliyet_detayli(adet, gramaj, kagit, cmyk_secim, pantone_sayisi, laminasyon, ozel_baski_1, ozel_baski_2, baski_sonrasi, "70x100 cm (Standart)", "70100", 700.0, 1000.0, 15.0, 1, 0.0, ebat_en, ebat_boy, ebat_yukseklik)
-            en_iyi_sonuc = {'adet': adet, 'gramaj': gramaj, 'kagit': kagit, 'fire': 5.0, 'ebat': "70x100 cm (Standart)", 'res': res}
-
-        return en_iyi_sonuc
-
-    plan_params = []
-    plan_params.append({**en_ekonomik_makineyi_bul(net_a, gramaj_a, kagit_cinsi_a), 'kod': 'A'})
-    plan_params.append({**en_ekonomik_makineyi_bul(net_b, gramaj_a, kagit_cinsi_a), 'kod': 'B'})
-    plan_params.append({**en_ekonomik_makineyi_bul(net_c, gramaj_a, kagit_cinsi_a), 'kod': 'C'})
-
-    if ikinci_kagit_var:
-        plan_params.append({**en_ekonomik_makineyi_bul(net_a, gramaj_b, kagit_cinsi_b), 'kod': 'A2'})
-        plan_params.append({**en_ekonomik_makineyi_bul(net_b, gramaj_b, kagit_cinsi_b), 'kod': 'B2'})
-        plan_params.append({**en_ekonomik_makineyi_bul(net_c, gramaj_b, kagit_cinsi_b), 'kod': 'C2'})
-
-    kar_orani = st.slider("Hedef Kar Marjı (%)", 0, 100, 30)
-
-    teklif_alternatifleri = []
-    for p in plan_params:
-        teklif_alternatifleri.append(p)
-
-    ozel_baski_ozet = ", ".join([ob for ob in [ozel_baski_1, ozel_baski_2] if ob != "Yok"]) or "Yok"
-    st.session_state.teklif_data = {
-        "firma_adi": firma_adi,
-        "urun_adi": urun_adi,
-        "urun_tipi": urun_tipi,
-        "ebat_en": ebat_en,
-        "ebat_boy": ebat_boy,
-        "ebat_yukseklik": ebat_yukseklik,
-        "cmyk_secim": cmyk_secim,
-        "pantone_sayisi": pantone_sayisi,
-        "laminasyon": laminasyon,
-        "baski_sonrasi": baski_sonrasi,
-        "ozel_baski": ozel_baski_ozet,
-        "ozel_istekler": ozel_istekler,
-        "kar_orani": kar_orani,
-        "alternatifler": teklif_alternatifleri
-    }
-
-    st.markdown("### 📊 ÜRETİM VE PLANLAMA ÖZETİ (GÜNCELLENMİŞ FORMÜL)")
-
-    def plan_kartini_yazdir(p):
-        r = p['res']
-        net_kullanici_adeti = p['adet']
-        
-        st.markdown(f"**Kağıt & Adet:** {net_kullanici_adeti:,} adet - {p['gramaj']}g {p['kagit']}")
-        
-        plan_df = pd.DataFrame([
-            {"Parametre / Kriter": "Fire Oranı (%)", "Değer": f"%{r['fire_pct']:.1f}"},
-            {"Parametre / Kriter": "Brüt Adet", "Değer": f"{r['brut_adet']:,} adet"},
-            {"Parametre / Kriter": "Montaj Planı", "Değer": f"1 Tabakada {r['montaj_adedi']} Ürün ({urun_tipi})"},
-            {"Parametre / Kriter": "Kullanılan Kağıt (Makine)", "Değer": p['ebat']},
-            {"Parametre / Kriter": "Kağıt Kilogram (kg)", "Değer": f"{r['kg_kagit']} kg"},
-            {"Parametre / Kriter": "Baskı Adedi Ön Ve Arka", "Değer": f"{r['tabaka_adeti']:,} tabaka"},
-            {"Parametre / Kriter": "Baskı Metodu", "Değer": r['gercek_baski_yuzu']},
-            {"Parametre / Kriter": "Kaç M2", "Değer": f"{r['toplam_m2']:,.2f} m²"}
-        ])
-        
-        st.table(plan_df)
-
-    if ikinci_kagit_var:
-        st.markdown("#### 🔹 Kağıt A Alternatifleri")
-        col_p1, col_p2, col_p3 = st.columns(3)
-        with col_p1: 
-            st.markdown("##### Alternatif A")
-            plan_kartini_yazdir(teklif_alternatifleri[0])
-        with col_p2: 
-            st.markdown("##### Alternatif B")
-            plan_kartini_yazdir(teklif_alternatifleri[1])
-        with col_p3: 
-            st.markdown("##### Alternatif C")
-            plan_kartini_yazdir(teklif_alternatifleri[2])
-
-    else:
-        col_p1, col_p2, col_p3 = st.columns(3)
-        with col_p1: 
-            st.markdown("##### Alternatif A")
-            plan_kartini_yazdir(teklif_alternatifleri[0])
-        with col_p2: 
-            st.markdown("##### Alternatif B")
-            plan_kartini_yazdir(teklif_alternatifleri[1])
-        with col_p3: 
-            st.markdown("##### Alternatif C")
-            plan_kartini_yazdir(teklif_alternatifleri[2])
-
-    st.markdown("---")
-    if st.button("📄 Müşteri İçin Hazır Fiyat Teklif Sayfasına Git", use_container_width=True, key="calc_to_teklif"):
-        go_page('teklif')
-        st.rerun()
-
-# ==========================================
-# MENÜ 4: MÜŞTERİ FİYAT TEKLİF SAYFASI
-# ==========================================
-elif st.session_state.page == 'teklif':
-    st.subheader("📄 Müşteri Fiyat Teklifi ve Ürün Şartnamesi")
-    
-    if st.session_state.teklif_data is None:
-        st.warning("⚠️ Henüz bir hesaplama yapılmadı. Lütfen önce 'Fiyat Çıkart' modülünden ürün hesaplamasını gerçekleştirin.")
-        if st.button("Forma Dön", key="teklif_to_calc"):
-            go_page('calc')
-            st.rerun()
-    else:
-        td = st.session_state.teklif_data
-        kar_orani = td['kar_orani']
-
-        st.markdown(
-            "<div style='background-color: #f8f9fa; padding: 20px; border-radius: 10px; border-left: 5px solid #1F4E78;'>"
-            "<h3 style='margin: 0; color: #1F4E78;'>OFFICIAL PRICE QUOTATION / FİYAT TEKLİF MEKTUBU</h3>"
-            f"<p style='margin: 5px 0 0 0;'><strong>Sayın:</strong> {td['firma_adi']}</p>"
-            "<p style='margin: 2px 0 0 0;'><strong>Tarih:</strong> 04 Kasım 2026 | <strong>Teklif No:</strong> OFF-2026-8492</p>"
-            "</div>", 
-            unsafe_allow_html=True
-        )
-        
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown("#### 1. Ürün & İmalat Teknik Özellikleri")
-        
-        col_t1, col_t2, col_t3 = st.columns(3)
-        with col_t1:
-            st.write(f"**Ürün Adı:** {td['urun_adi']}")
-            st.write(f"**Ürün Tipi:** {td['urun_tipi']}")
-            st.write(f"**Ebat:** {td['ebat_en']} mm x {td['ebat_boy']} mm x {td['ebat_yukseklik']} mm")
-        with col_t2:
-            st.write(f"**Baskı CMYK:** {td['cmyk_secim']}")
-            st.write(f"**Pantone Renk:** {td['pantone_sayisi']}")
-            st.write(f"**Yüzey Kaplama:** {td['laminasyon']}")
-        with col_t3:
-            st.write(f"**Özel İşlem:** {td['ozel_baski']}")
-            st.write(f"**Kesim/Mücellit:** {td['baski_sonrasi']}")
-
-        st.markdown("---")
-        st.markdown("#### 2. Adet Alternatiflerine Göre Fiyat Tablosu")
-
-        table_rows = []
-        for alt in td['alternatifler']:
-            res = alt['res']
-            net_adet = alt['adet']
-            net_maliyet = res['toplam_uretim_maliyeti']
-            kar_tutari = net_maliyet * (kar_orani / 100.0)
-            toplam_satis_tl = net_maliyet + kar_tutari
-            birim_satis_tl = toplam_satis_tl / net_adet if net_adet > 0 else 0
-
-            table_rows.append({
-                "Alternatif": f"Option {alt['kod']}",
-                "Net Adet": f"{net_adet:,} adet",
-                "Kağıt Özelliği": f"{alt['gramaj']} gr {alt['kagit']}",
-                "Tabaka Ebadı": alt['ebat'],
-                "Kağıt Ağırlığı": f"{res['kg_kagit']} kg",
-                "Birim Satış Fiyatı (TL)": f"₺{birim_satis_tl:,.4f}",
-                "Karlı Toplam Tutar (TL)": f"₺{toplam_satis_tl:,.2f}"
-            })
-
-        df_teklif = pd.DataFrame(table_rows)
-        st.dataframe(df_teklif, use_container_width=True, hide_index=True)
+            res = hesapla_maliyet_detayli(adet, gramaj, kagit, cmyk_secim
