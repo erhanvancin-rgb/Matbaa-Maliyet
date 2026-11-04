@@ -260,43 +260,38 @@ elif st.session_state.page == 'calc':
         tab_en = tab_en_mm / 1000.0
         tab_boy = tab_boy_mm / 1000.0
 
-        # --- YENİ BLEED (2mm) VE MAKAS PAYI GEOMETRİSİ ---
-        # Ürün ölçülerine her kenara 2 mm (toplam en/boy başına +4 mm) bleed eklenir
-        urun_en_bleed = ebat_en + 4.0
-        urun_boy_bleed = ebat_boy + 4.0
+        # --- KESİN FİZİKSEL SINIR VE BLEED (2mm) HESABI ---
+        # Ürün ölçülerine her kenara 2mm bleed (toplamda en/boy başına +4mm) eklenir
+        w_bleed = ebat_en + 4.0
+        h_bleed = ebat_boy + 4.0
 
-        # Makas payı kağıdın kısa kenarından düşülür
-        # 4 olası yerleşim kombinasyonu test edilir
-        def get_montaj(w1, h1, w2, h2, max_w, max_h, makas):
-            # Kombinasyon 1: w2 yatay, h2 dikey (Kısa kenar h1 veya w1 hangisi makas alacak)
-            # Kısa kenar sınırından makas payı düşülür
-            s1_x = math.floor(max_w / w1)
-            s1_y = math.floor((max_h - makas) / h1)
-            m1 = max(0, s1_x * s1_y)
+        def fiziksel_montaj_bul(tw, th, w, h, makas):
+            # tw, th: Kağıdın mm cinsinden en ve boyu
+            # w, h: Ürün bleedsiz ölçüsü + 4mm
+            best_m = 0
+            # 2 rotasyon (normal ve döndürülmüş) ve 2 makas yönü (en veya boy üzerinden düşme)
+            for (prod_w, prod_h) in [(w, h), (h, w)]:
+                # Senaryo 1: Makas kısa kenardan (tw) düşülsün
+                if tw > makas:
+                    s_x = math.floor((tw - makas) / prod_w)
+                    s_y = math.floor(th / prod_h)
+                    best_m = max(best_m, s_x * s_y)
+                
+                # Senaryo 2: Makas uzun kenardan (th) düşülsün
+                if th > makas:
+                    s_x2 = math.floor(tw / prod_w)
+                    s_y2 = math.floor((th - makas) / prod_h)
+                    best_m = max(best_m, s_x2 * s_y2)
+            return best_m
 
-            s2_x = math.floor((max_w - makas) / w1)
-            s2_y = math.floor(max_h / h1)
-            m2 = max(0, s2_x * s2_y)
-
-            # Döndürülmüş (w2, h2 yer değiştirmiş)
-            s3_x = math.floor(max_w / h1)
-            s3_y = math.floor((max_h - makas) / w1)
-            m3 = max(0, s3_x * s3_y)
-
-            s4_x = math.floor((max_w - makas) / h1)
-            s4_y = math.floor(max_h / w1)
-            m4 = max(0, s4_x * s4_y)
-
-            return max(m1, m2, m3, m4)
-
-        montaj_adedi = max(1, get_montaj(urun_en_bleed, urun_boy_bleed, urun_boy_bleed, urun_en_bleed, tab_en_mm, tab_boy_mm, makas_payi_mm))
+        montaj_adedi = max(1, fiziksel_montaj_bul(tab_en_mm, tab_boy_mm, w_bleed, h_bleed, makas_payi_mm))
 
         revolta_uygun_kagit = kagit_cinsi in ["Kuşe Kağıt", "1. Hamur Kağıt"]
         
         # --- REVOLTA KURALI KONTROLÜ ---
         # Revolta sadece Kuşe/Hamur kağıtta ve imalat adedi çift sayı ise uygulanabilir!
         gercek_baski_yuzu = baski_yuzu
-        if baski_yuzu in ["Çift Yüz", "Ön dan Arka Baskı", "Revolta Baskı", "Çift Yüz"]:
+        if baski_yuzu in ["Çift Yüz", "Ön ve Arka Baskı", "Revolta Baskı", "Çift Yüz"]:
             if revolta_uygun_kagit and (montaj_adedi % 2 == 0):
                 gercek_baski_yuzu = "Revolta Baskı"
             else:
@@ -478,16 +473,40 @@ elif st.session_state.page == 'calc':
 
     st.markdown("---")
 
-    # --- 🧠 AKILLI ÇAPRAZ MAKİNE OPTİMİZASYONU (EN EKONOMİK SEÇİM) ---
+    # --- 🧠 AKILLI ÇAPRAZ MAKİNE OPTİMİZASYONU (GEOMETRİK FİT KONTROLLÜ) ---
     def en_ekonomik_makineyi_bul(adet, gramaj, kagit):
-        aday_ebatlar = ["32x45 cm", "45x64 cm", "64x90 cm"]
+        # Sadece sığan (montaj_adedi > 0 olan) makineleri değerlendirir ve maliyeti en düşük olanı seçer.
+        aday_ebatlar = [
+            ("32x45 cm", 350.0, 500.0, 10.0),
+            ("45x64 cm", 450.0, 640.0, 12.0),
+            ("64x90 cm", 640.0, 900.0, 15.0)
+        ]
+        
         en_iyi_sonuc = None
         en_dusuk_maliyet = float('inf')
 
-        for ebat in aday_ebatlar:
+        # Ürün bleedli ölçüleri
+        w_bleed = ebat_en + 4.0
+        h_bleed = ebat_boy + 4.0
+
+        for ebat_adi, tw, th, makas in aday_ebatlar:
+            # Önce bu ebat kağıda bu ürün fiziksel olarak sığıyor mu kontrol et
+            test_montaj = 0
+            for (pw, ph) in [(w_bleed, h_bleed), (h_bleed, w_bleed)]:
+                if tw > makas:
+                    s1 = math.floor((tw - makas) / pw) * math.floor(th / ph)
+                    test_montaj = max(test_montaj, s1)
+                if th > makas:
+                    s2 = math.floor(tw / pw) * math.floor((th - makas) / ph)
+                    test_montaj = max(test_montaj, s2)
+            
+            # Eğer sığmıyorsa (montaj 0 ise) bu makineyi direkt atla!
+            if test_montaj <= 0:
+                continue
+
             res = hesapla_maliyet_detayli(
                 adet, gramaj, kagit, cmyk_secim, pantone_sayisi, 
-                laminasyon, ozel_baski_1, ozel_baski_2, baski_sonrasi, ebat, 
+                laminasyon, ozel_baski_1, ozel_baski_2, baski_sonrasi, ebat_adi, 
                 0.0, ebat_en, ebat_boy, ebat_yukseklik
             )
             
@@ -498,7 +517,12 @@ elif st.session_state.page == 'calc':
             maliyet = res['toplam_uretim_maliyeti']
             if maliyet < en_dusuk_maliyet:
                 en_dusuk_maliyet = maliyet
-                en_iyi_sonuc = {'adet': adet, 'gramaj': gramaj, 'kagit': kagit, 'fire': fire, 'ebat': ebat, 'res': res}
+                en_iyi_sonuc = {'adet': adet, 'gramaj': gramaj, 'kagit': kagit, 'fire': fire, 'ebat': ebat_adi, 'res': res}
+
+        # Hiçbirine sığmıyorsa en küçük ebatı fallback olarak ver
+        if en_iyi_sonuc is None:
+            res = hesapla_maliyet_detayli(adet, gramaj, kagit, cmyk_secim, pantone_sayisi, laminasyon, ozel_baski_1, ozel_baski_2, baski_sonrasi, "45x64 cm", 0.0, ebat_en, ebat_boy, ebat_yukseklik)
+            en_iyi_sonuc = {'adet': adet, 'gramaj': gramaj, 'kagit': kagit, 'fire': 5.0, 'ebat': "45x64 cm", 'res': res}
 
         return en_iyi_sonuc
 
@@ -537,7 +561,7 @@ elif st.session_state.page == 'calc':
         "alternatifler": teklif_alternatifleri
     }
 
-    st.markdown("### 📊 ÜRETİM VE PLANLAMA ÖZETİ (BLEED 2MM & MAKAS PAYI UYUMLU)")
+    st.markdown("### 📊 ÜRETİM VE PLANLAMA ÖZETİ (FİZİKSEL SINIR & MAKAS KONTROLLÜ)")
 
     def plan_kartini_yazdir(p):
         r = p['res']
