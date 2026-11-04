@@ -258,12 +258,11 @@ elif st.session_state.page == 'calc':
 
         # GEÇİŞ SAYISI VE KALIP SAYISI MANTIĞI
         gecis_sayisi = 1
-        kalıp_sayisi = 4 # CMYK standart 4 renk kalıp
+        kalıp_sayisi = 4 
 
         is_cift_yuz = baski_yuzu in ["Çift Yüz", "Ön ve Arka Baskı", "Revolta Baskı", "Çift Yüz (Normal)"]
         is_bristol_krome = kagit_cinsi in ["Amerikan Bristol", "Krome Karton"]
 
-        # Pantone / Özel Renk Eklenmiş mi?
         has_pantone = pantone_secimi != "Yok"
         is_cift_yuz_pantone = "Çift Yüz" in pantone_secimi
 
@@ -271,7 +270,6 @@ elif st.session_state.page == 'calc':
             if "1 renk" in pantone_secimi: kalıp_sayisi = 5
             elif "2 renk" in pantone_secimi: kalıp_sayisi = 6
 
-        # Geçiş kuralları
         if is_cift_yuz and is_bristol_krome:
             gecis_sayisi = 2
         elif has_pantone and not is_cift_yuz_pantone:
@@ -421,15 +419,14 @@ elif st.session_state.page == 'calc':
 
     col_ebat1, col_ebat2, col_ebat3, col_baski1, col_baski2 = st.columns(5)
     with col_ebat1:
-        ebat_en = st.number_input("En (mm) [A]", value=150, key="ebat_en")
+        ebat_en = st.number_input("En (mm) [A]", value=100, key="ebat_en")
     with col_ebat2:
-        ebat_boy = st.number_input("Boy (mm) [B]", value=240, key="ebat_boy")
+        ebat_boy = st.number_input("Boy (mm) [B]", value=150, key="ebat_boy")
     with col_ebat3:
         ebat_yukseklik = st.number_input("Yükseklik (mm) [C]", value=30, key="ebat_yukseklik")
     with col_baski1:
         cmyk_secim = st.selectbox("Baskı CMYK", ["Çift Yüz", "Tek Yüz", "CMYK Baskı yok"], key="cmyk_secim")
     with col_baski2:
-        # İstenen 8 sıra pantone ve özel renk seçeneği
         pantone_secenekleri = [
             "Yok", 
             "1 renk zemin", 
@@ -516,37 +513,42 @@ elif st.session_state.page == 'calc':
 
         return best_m
 
-    def en_ekonomik_makineyi_bul(adet, gramaj, kagit):
+    def en_ekonomik_makineyi_bul(adet, gramaj, kagit, sabit_ebat_tuple=None):
         aday_kagitlar = []
         
-        if kagit in ["Kuşe Kağıt", "1. Hamur Kağıt"]:
-            aday_kagitlar.append(("70x100 cm (70x100 Makine)", 700.0, 1000.0, "70100", 15.0))
-            aday_kagitlar.append(("50x70 cm (50x70 Makine)", 500.0, 700.0, "5070", 12.0))
-            aday_kagitlar.append(("35x50 cm (35x50 Makine)", 350.0, 500.0, "3550", 10.0))
-            aday_kagitlar.append(("70x95 cm (70x100 Makine)", 700.0, 950.0, "70100", 15.0))
+        if sabit_ebat_tuple is not None:
+            # Eğer Alternatif A'da ebat sabitlendiyse B ve C doğrudan aynı ebadı kullanır
+            aday_kagitlar.append(sabit_ebat_tuple)
         else:
-            aday_kagitlar.append(("70x100 cm (Standart)", 700.0, 1000.0, "70100", 15.0))
-            aday_kagitlar.append(("50x70 cm (Standart)", 500.0, 700.0, "5070", 12.0))
-            aday_kagitlar.append(("35x50 cm (Standart)", 350.0, 500.0, "3550", 10.0))
-            aday_kagitlar.append(("70x95 cm (Özel Bobin Kesim)", 700.0, 950.0, "70100", 15.0))
-            
-            for w_cm in range(30, 75, 5):
-                for h_cm in range(w_cm, 105, 5):
-                    if w_cm <= 35 and h_cm <= 50:
-                        makine_k, makas_k = "3550", 10.0
-                    elif w_cm <= 50 and h_cm <= 70:
-                        makine_k, makas_k = "5070", 12.0
-                    elif w_cm <= 70 and h_cm <= 100:
-                        makine_k, makas_k = "70100", 15.0
-                    else:
-                        continue
-                    
-                    ebat_str = f"{w_cm}x{h_cm} cm (Özel Bobin Kesim)"
-                    if ebat_str not in [x[0] for x in aday_kagitlar]:
-                        aday_kagitlar.append((ebat_str, float(w_cm*10), float(h_cm*10), makine_k, makas_k))
+            if kagit in ["Kuşe Kağıt", "1. Hamur Kağıt"]:
+                aday_kagitlar.append(("70x100 cm (70x100 Makine)", 700.0, 1000.0, "70100", 15.0))
+                aday_kagitlar.append(("50x70 cm (50x70 Makine)", 500.0, 700.0, "5070", 12.0))
+                aday_kagitlar.append(("35x50 cm (35x50 Makine)", 350.0, 500.0, "3550", 10.0))
+                aday_kagitlar.append(("70x95 cm (70x100 Makine)", 700.0, 950.0, "70100", 15.0))
+            else:
+                aday_kagitlar.append(("70x100 cm (Standart)", 700.0, 1000.0, "70100", 15.0))
+                aday_kagitlar.append(("50x70 cm (Standart)", 500.0, 700.0, "5070", 12.0))
+                aday_kagitlar.append(("35x50 cm (Standart)", 350.0, 500.0, "3550", 10.0))
+                aday_kagitlar.append(("70x95 cm (Özel Bobin Kesim)", 700.0, 950.0, "70100", 15.0))
+                
+                for w_cm in range(30, 75, 5):
+                    for h_cm in range(w_cm, 105, 5):
+                        if w_cm <= 35 and h_cm <= 50:
+                            makine_k, makas_k = "3550", 10.0
+                        elif w_cm <= 50 and h_cm <= 70:
+                            makine_k, makas_k = "5070", 12.0
+                        elif w_cm <= 70 and h_cm <= 100:
+                            makine_k, makas_k = "70100", 15.0
+                        else:
+                            continue
+                        
+                        ebat_str = f"{w_cm}x{h_cm} cm (Özel Bobin Kesim)"
+                        if ebat_str not in [x[0] for x in aday_kagitlar]:
+                            aday_kagitlar.append((ebat_str, float(w_cm*10), float(h_cm*10), makine_k, makas_k))
 
         en_iyi_sonuc = None
         en_dusuk_maliyet = float('inf')
+        secilen_ebat_tuple = None
 
         for kagit_adi, tw, th, makine_kodu, makas in aday_kagitlar:
             montaj = fiziksel_montaj_bul(tw, th, ebat_en, ebat_boy, ebat_yukseklik, makas, urun_tipi)
@@ -558,7 +560,7 @@ elif st.session_state.page == 'calc':
                 kagit_adi, makine_kodu, tw, th, makas, montaj, 0.0, ebat_en, ebat_boy, ebat_yukseklik
             )
             
-            if "Özel Bobin Kesim" in kagit_adi and res['kg_kagit'] < 600:
+            if "Özel Bobin Kesim" in kagit_adi and res['kg_kagit'] < 600 and sabit_ebat_tuple is None:
                 continue
                 
             maliyet = res['toplam_uretim_maliyeti']
@@ -568,22 +570,33 @@ elif st.session_state.page == 'calc':
                 elif adet <= 3000: fire = 7.0
                 else: fire = 5.0
                 en_iyi_sonuc = {'adet': adet, 'gramaj': gramaj, 'kagit': kagit, 'fire': fire, 'ebat': kagit_adi, 'res': res}
+                secilen_ebat_tuple = (kagit_adi, tw, th, makine_kodu, makas)
 
         if en_iyi_sonuc is None:
             res = hesapla_maliyet_detayli(adet, gramaj, kagit, cmyk_secim, pantone_secimi, laminasyon, ozel_baski_1, ozel_baski_2, baski_sonrasi, "70x95 cm (Özel Bobin Kesim)", "70100", 700.0, 950.0, 15.0, 6, 0.0, ebat_en, ebat_boy, ebat_yukseklik)
             en_iyi_sonuc = {'adet': adet, 'gramaj': gramaj, 'kagit': kagit, 'fire': 5.0, 'ebat': "70x95 cm (Özel Bobin Kesim)", 'res': res}
+            secilen_ebat_tuple = ("70x95 cm (Özel Bobin Kesim)", 700.0, 950.0, "70100", 15.0)
 
-        return en_iyi_sonuc
+        return en_iyi_sonuc, secilen_ebat_tuple
 
-    plan_params = []
-    plan_params.append({**en_ekonomik_makineyi_bul(net_a, gramaj_a, kagit_cinsi_a), 'kod': 'A'})
-    plan_params.append({**en_ekonomik_makineyi_bul(net_b, gramaj_a, kagit_cinsi_a), 'kod': 'B'})
-    plan_params.append({**en_ekonomik_makineyi_bul(net_c, gramaj_a, kagit_cinsi_a), 'kod': 'C'})
+    # Alternatif A hesaplanıyor ve ebat sabitleniyor
+    res_a, sabit_tuple = en_ekonomik_makineyi_bul(net_a, gramaj_a, kagit_cinsi_a)
+    plan_params = [{**res_a, 'kod': 'A'}]
+    
+    # Alternatif B ve C aynı sabit ebat üzerinden tiraj ölçekliyor
+    res_b, _ = en_ekonomik_makineyi_bul(net_b, gramaj_a, kagit_cinsi_a, sabit_ebat_tuple=sabit_tuple)
+    plan_params.append({**res_b, 'kod': 'B'})
+    
+    res_c, _ = en_ekonomik_makineyi_bul(net_c, gramaj_a, kagit_cinsi_a, sabit_ebat_tuple=sabit_tuple)
+    plan_params.append({**res_c, 'kod': 'C'})
 
     if ikinci_kagit_var:
-        plan_params.append({**en_ekonomik_makineyi_bul(net_a, gramaj_b, kagit_cinsi_b), 'kod': 'A2'})
-        plan_params.append({**en_ekonomik_makineyi_bul(net_b, gramaj_b, kagit_cinsi_b), 'kod': 'B2'})
-        plan_params.append({**en_ekonomik_makineyi_bul(net_c, gramaj_b, kagit_cinsi_b), 'kod': 'C2'})
+        res_a2, sabit_tuple_2 = en_ekonomik_makineyi_bul(net_a, gramaj_b, kagit_cinsi_b)
+        plan_params.append({**res_a2, 'kod': 'A2'})
+        res_b2, _ = en_ekonomik_makineyi_bul(net_b, gramaj_b, kagit_cinsi_b, sabit_ebat_tuple=sabit_tuple_2)
+        plan_params.append({**res_b2, 'kod': 'B2'})
+        res_c2, _ = en_ekonomik_makineyi_bul(net_c, gramaj_b, kagit_cinsi_b, sabit_ebat_tuple=sabit_tuple_2)
+        plan_params.append({**res_c2, 'kod': 'C2'})
 
     kar_orani = st.slider("Hedef Kar Marjı (%)", 0, 100, 30)
 
@@ -609,7 +622,7 @@ elif st.session_state.page == 'calc':
         "alternatifler": teklif_alternatifleri
     }
 
-    st.markdown("### 📊 ÜRETİM VE PLANLAMA ÖZETİ (GEÇİŞ VE KALIP SAYISI EKLENMİŞ)")
+    st.markdown("### 📊 ÜRETİM VE PLANLAMA ÖZETİ (SABİT EBAT KİLİTLİ)")
 
     def plan_kartini_yazdir(p):
         r = p['res']
@@ -645,6 +658,17 @@ elif st.session_state.page == 'calc':
             st.markdown("##### Alternatif C")
             plan_kartini_yazdir(teklif_alternatifleri[2])
 
+        st.markdown("#### 🔹 Kağıt B Alternatifleri")
+        col_p4, col_p5, col_p6 = st.columns(3)
+        with col_p4: 
+            st.markdown("##### Alternatif A2")
+            plan_kartini_yazdir(teklif_alternatifleri[3])
+        with col_p5: 
+            st.markdown("##### Alternatif B2")
+            plan_kartini_yazdir(teklif_alternatifleri[4])
+        with col_p6: 
+            st.markdown("##### Alternatif C2")
+            plan_kartini_yazdir(teklif_alternatifleri[5])
     else:
         col_p1, col_p2, col_p3 = st.columns(3)
         with col_p1: 
