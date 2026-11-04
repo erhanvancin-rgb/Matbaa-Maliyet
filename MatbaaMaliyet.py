@@ -144,7 +144,6 @@ if st.session_state.page == 'calc':
 
         revolta_uygun_kagit = kagit_cinsi in ["Kuşe Kağıt", "1. Hamur Kağıt"]
         
-        # --- REVOLTA KURALI ---
         gercek_baski_yuzu = baski_yuzu
         if baski_yuzu in ["Çift Yüz", "Ön ve Arka Baskı"]:
             if revolta_uygun_kagit and (montaj_adedi % 2 == 0):
@@ -298,9 +297,9 @@ if st.session_state.page == 'calc':
 
     col_ebat1, col_ebat2, col_ebat3, col_baski1, col_baski2 = st.columns(5)
     with col_ebat1:
-        ebat_en = st.number_input("En (mm)", value=240, key="ebat_en")
+        ebat_en = st.number_input("En (mm)", value=290, key="ebat_en")
     with col_ebat2:
-        ebat_boy = st.number_input("Boy (mm)", value=110, key="ebat_boy")
+        ebat_boy = st.number_input("Boy (mm)", value=290, key="ebat_boy")
     with col_ebat3:
         ebat_yukseklik = st.number_input("Yükseklik (mm)", value=0, key="ebat_yukseklik")
     with col_baski1:
@@ -337,33 +336,40 @@ if st.session_state.page == 'calc':
                 best_m = max(best_m, math.floor(tw / pw) * math.floor((th - makas) / ph))
         return best_m
 
-    # BÜYÜK OYUN: YENİ NESİL MAKİNE-KAĞIT SAVAŞTIRMA DÖNGÜSÜ
     def en_ekonomik_makineyi_bul(adet, gramaj, kagit):
         aday_kagitlar = []
         
         if kagit in ["Kuşe Kağıt", "1. Hamur Kağıt"]:
-            # 1. 70x100 Ailesi
-            aday_kagitlar.append(("70x100 cm Kağıt (70x100 Makine)", 700.0, 1000.0, "70100", 15.0))
-            aday_kagitlar.append(("50x70 cm Kağıt (50x70 Makine)", 500.0, 700.0, "5070", 12.0))
-            aday_kagitlar.append(("35x50 cm Kağıt (35x50 Makine)", 350.0, 500.0, "3550", 10.0))
-            
-            # 2. 64x90 Ailesi
-            aday_kagitlar.append(("64x90 cm Kağıt (70x100 Makine)", 640.0, 900.0, "70100", 15.0))
-            aday_kagitlar.append(("45x64 cm Kağıt (50x70 Makine)", 450.0, 640.0, "5070", 12.0))
-            aday_kagitlar.append(("32x45 cm Kağıt (35x50 Makine)", 320.0, 450.0, "3550", 10.0))
+            # --- 70x100 AİLESİ BÖLÜNMELERİ ---
+            aday_kagitlar.append(("70x100 cm (70x100 Makine)", 700.0, 1000.0, "70100", 15.0))
+            aday_kagitlar.append(("50x70 cm (50x70 Makine)", 500.0, 700.0, "5070", 12.0))
+            aday_kagitlar.append(("33.3x70 cm (50x70 Makine)", 333.0, 700.0, "5070", 12.0))
+            aday_kagitlar.append(("35x65 cm (50x70 Makine)", 350.0, 650.0, "5070", 12.0))
+            aday_kagitlar.append(("35x50 cm (35x50 Makine)", 350.0, 500.0, "3550", 10.0))
+            aday_kagitlar.append(("23x50 cm (35x50 Makine)", 230.0, 500.0, "3550", 10.0))
+            aday_kagitlar.append(("25x45 cm (35x50 Makine)", 250.0, 450.0, "3550", 10.0))
 
-            # 3. 57x82 Ailesi (Sadece gramaj <= 170g ise çalışır!)
+            # --- 64x90 AİLESİ BÖLÜNMELERİ ---
+            aday_kagitlar.append(("64x90 cm (70x100 Makine)", 640.0, 900.0, "70100", 15.0))
+            aday_kagitlar.append(("45x64 cm (50x70 Makine)", 450.0, 640.0, "5070", 12.0))
+            aday_kagitlar.append(("30x64 cm (50x70 Makine)", 300.0, 640.0, "5070", 12.0))
+            aday_kagitlar.append(("31x59 cm (50x70 Makine)", 310.0, 590.0, "5070", 12.0))
+            aday_kagitlar.append(("32x45 cm (35x50 Makine)", 320.0, 450.0, "3550", 10.0))
+            aday_kagitlar.append(("21.3x45 cm (35x50 Makine)", 213.0, 450.0, "3550", 10.0))
+            aday_kagitlar.append(("22.5x41.5 cm (35x50 Makine)", 225.0, 415.0, "3550", 10.0))
+
+            # --- 57x82 AİLESİ BÖLÜNMELERİ (Sadece 170g ve altı) ---
             if gramaj <= 170:
-                aday_kagitlar.append(("57x82 cm Kağıt (70x100 Makine)", 570.0, 820.0, "70100", 15.0))
-                aday_kagitlar.append(("41x57 cm Kağıt (50x70 Makine)", 410.0, 570.0, "5070", 12.0))
-                aday_kagitlar.append(("28.5x41 cm Kağıt (35x50 Makine)", 285.0, 410.0, "3550", 10.0))
+                aday_kagitlar.append(("57x82 cm (70x100 Makine)", 570.0, 820.0, "70100", 15.0))
+                aday_kagitlar.append(("41x57 cm (50x70 Makine)", 410.0, 570.0, "5070", 12.0))
+                aday_kagitlar.append(("28.5x41 cm (35x50 Makine)", 285.0, 410.0, "3550", 10.0))
                 
-        else: # Amerikan Bristol veya Krome Karton
-            aday_kagitlar.append(("70x100 cm Kağıt (Standart)", 700.0, 1000.0, "70100", 15.0))
-            aday_kagitlar.append(("50x70 cm Kağıt (Standart)", 500.0, 700.0, "5070", 12.0))
-            aday_kagitlar.append(("35x50 cm Kağıt (Standart)", 350.0, 500.0, "3550", 10.0))
+        else:
+            # --- BRİSTOL & KROME (Bobin Kesim Dinamikleri) ---
+            aday_kagitlar.append(("70x100 cm (Standart)", 700.0, 1000.0, "70100", 15.0))
+            aday_kagitlar.append(("50x70 cm (Standart)", 500.0, 700.0, "5070", 12.0))
+            aday_kagitlar.append(("35x50 cm (Standart)", 350.0, 500.0, "3550", 10.0))
             
-            # Özel Bobin Ebatları (5cm'nin katları) - Min 30x30'dan Max 70x100'e kadar tüm olasılıklar
             for w_cm in range(30, 75, 5):
                 for h_cm in range(w_cm, 105, 5):
                     if (w_cm, h_cm) not in [(35,50), (50,70), (70,100)]:
@@ -375,7 +381,7 @@ if st.session_state.page == 'calc':
                             makine_k, makas_k = "70100", 15.0
                         else:
                             continue
-                        aday_kagitlar.append((f"{w_cm}x{h_cm} cm (Özel Bobin Ebat)", float(w_cm*10), float(h_cm*10), makine_k, makas_k))
+                        aday_kagitlar.append((f"{w_cm}x{h_cm} cm (Özel Bobin Kesim)", float(w_cm*10), float(h_cm*10), makine_k, makas_k))
 
         en_iyi_sonuc = None
         en_dusuk_maliyet = float('inf')
@@ -392,22 +398,18 @@ if st.session_state.page == 'calc':
                 kagit_adi, makine_kodu, tw, th, makas, montaj, 0.0, ebat_en, ebat_boy, ebat_yukseklik
             )
             
-            # KARTON/BRISTOL ÖZEL KURALI: Bobinden özel ebat kesilmesi için işin toplam kağıt ağırlığı >= 600kg olmalı
-            if "Özel Bobin Ebat" in kagit_adi and res['kg_kagit'] < 600:
+            if "Özel Bobin Kesim" in kagit_adi and res['kg_kagit'] < 600:
                 continue
                 
             maliyet = res['toplam_uretim_maliyeti']
             if maliyet < en_dusuk_maliyet:
                 en_dusuk_maliyet = maliyet
-                
                 if adet <= 1500: fire = 10.0
                 elif adet <= 3000: fire = 7.0
                 else: fire = 5.0
-                
                 en_iyi_sonuc = {'adet': adet, 'gramaj': gramaj, 'kagit': kagit, 'fire': fire, 'ebat': kagit_adi, 'res': res}
 
         if en_iyi_sonuc is None:
-            # Fallback (Hiçbiri tutmazsa Standart 50x70 ile maliyet ver)
             res = hesapla_maliyet_detayli(adet, gramaj, kagit, cmyk_secim, pantone_sayisi, laminasyon, ozel_baski_1, ozel_baski_2, baski_sonrasi, "50x70 cm (Standart)", "5070", 500.0, 700.0, 12.0, 1, 0.0, ebat_en, ebat_boy, ebat_yukseklik)
             en_iyi_sonuc = {'adet': adet, 'gramaj': gramaj, 'kagit': kagit, 'fire': 5.0, 'ebat': "50x70 cm (Standart)", 'res': res}
 
@@ -447,7 +449,7 @@ if st.session_state.page == 'calc':
         "alternatifler": teklif_alternatifleri
     }
 
-    st.markdown("### 📊 ÜRETİM VE PLANLAMA ÖZETİ (GELİŞMİŞ KAĞIT OPTİMİZASYONU)")
+    st.markdown("### 📊 ÜRETİM VE PLANLAMA ÖZETİ (GELİŞMİŞ KAĞIT BÖLÜNME OPTİMİZASYONU)")
 
     def plan_kartini_yazdir(p):
         r = p['res']
