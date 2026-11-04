@@ -218,18 +218,15 @@ elif st.session_state.page == 'calc':
         if "70x100" in basilacak_ebat:
             tab_en, tab_boy = 0.70, 1.00
             ebat_kodu = "70100"
-        elif "50x70" in basilacak_ebat:
-            tab_en, tab_boy = 0.50, 0.70
-            ebat_kodu = "5070"
-        elif "35x50" in basilacak_ebat:
-            tab_en, tab_boy = 0.35, 0.50
+        elif "50x70" in basilacak_ebat or "32x45" in basilacak_ebat:
+            tab_en, tab_boy = 0.32, 0.45
             ebat_kodu = "3550"
-        elif "57x82" in basilacak_ebat:
-            tab_en, tab_boy = 0.57, 0.82
-            ebat_kodu = "5070"
         elif "64x90" in basilacak_ebat:
             tab_en, tab_boy = 0.64, 0.90
             ebat_kodu = "70100"
+        elif "45x64" in basilacak_ebat:
+            tab_en, tab_boy = 0.45, 0.64
+            ebat_kodu = "5070"
         else:
             tab_en, tab_boy = 0.70, 1.00
             ebat_kodu = "70100"
@@ -422,15 +419,13 @@ elif st.session_state.page == 'calc':
     def otomatik_planlama_hesapla(adet, gramaj, kagit):
         if adet <= 1500:
             fire = 10.0
+            ebat = "32x45 cm"
         elif adet <= 3000:
             fire = 7.0
+            ebat = "64x90 cm"
         else:
             fire = 5.0
-            
-        if adet <= 2000:
-            ebat = "50x70 cm"
-        else:
-            ebat = "70x100 cm"
+            ebat = "45x64 cm"
             
         return {'adet': adet, 'gramaj': gramaj, 'kagit': kagit, 'fire': fire, 'ebat': ebat}
 
