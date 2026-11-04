@@ -6,7 +6,7 @@ import pandas as pd
 import json
 import os
 
-st.set_page_config(page_title="Matbaa ve Ambalaj Maliyet & Teklif Sistemi", layout="wide")
+st.set_page_config(page_title="Matbaa dan Ambalaj Maliyet & Teklif Sistemi", layout="wide")
 
 # --- 0. KALICI JSON PARAMETRE YÖNETİMİ ---
 PARAM_FILE = "matbaa_parametreleri.json"
@@ -221,7 +221,7 @@ elif st.session_state.page == 'params':
 # ==========================================
 elif st.session_state.page == 'calc':
     
-    # 1. YENİ DİNAMİK MONTAJ FORMÜLÜ (ARAYÜZÜ BOZMADAN SADECE MATEMATİK)
+    # 1. DİNAMİK JIGSAW (İÇ İÇE GEÇME) MONTAJ FORMÜLÜ
     def fiziksel_montaj_bul(tw, th, en, boy, yukseklik, makas, kutu_formu):
         if tw > th:
             tw, th = th, tw 
@@ -234,7 +234,6 @@ elif st.session_state.page == 'calc':
                 item_w = kutu_acik_en * s_en
                 
                 if kutu_formu in ["Dip Kilitli Kutu", "Dip Kilit Yapıştırmalı Kutu", "Dip Yapıştırmalı Kutu"]:
-                    # Jigsaw (İçiçe) Mantığı: Çift kutular birbirine girer
                     pair_boy = (boy * 2.0) + ((yukseklik + 15.0) * 2.0)
                     tek_boy = boy + ((yukseklik + 15.0) * 2.0)
                     
@@ -246,11 +245,9 @@ elif st.session_state.page == 'calc':
                     item_h = (boy + ((yukseklik + 15.0) * 2.0)) * s_boy
                 
                 sigar_mi = False
-                
                 if tw > makas:
                     if (item_w <= tw - makas) and (item_h <= th): sigar_mi = True
                     if (item_h <= tw - makas) and (item_w <= th): sigar_mi = True
-                
                 if th > makas:
                     if (item_w <= th - makas) and (item_h <= tw): sigar_mi = True
                     if (item_h <= th - makas) and (item_w <= tw): sigar_mi = True
@@ -273,15 +270,11 @@ elif st.session_state.page == 'calc':
         if fire_orani_override > 0:
             fire_pct = fire_orani_override
         else:
-            if net_adet <= 1500:
-                fire_pct = 10.0
-            elif net_adet <= 3000:
-                fire_pct = 7.0
-            else:
-                fire_pct = 5.0
+            if net_adet <= 1500: fire_pct = 10.0
+            elif net_adet <= 3000: fire_pct = 7.0
+            else: fire_pct = 5.0
 
         brut_adet = int(math.ceil(net_adet * (1 + (fire_pct / 100.0))))
-        
         tab_en = tab_en_mm / 1000.0
         tab_boy = tab_boy_mm / 1000.0
 
@@ -299,21 +292,22 @@ elif st.session_state.page == 'calc':
             tabaka_adeti = 100
 
         gecis_sayisi = 1
-        kalıp_sayisi = 4 
-
-        is_cift_yuz = baski_yuzu in ["Çift Yüz", "Ön ve Arka Baskı", "Revolta Baskı", "Çift Yüz (Normal)"]
-        is_bristol_krome = kagit_cinsi in ["Amerikan Bristol", "Krome Karton"]
+        
+        # --- KALIP SAYISI DÜZELTMESİ (Tek Yüz 4, Çift Yüz 8) ---
+        is_cift_yuz = baski_yuzu in ["Çift Yüz", "Ön ve Arka Baskı", "Çift Yüz (Normal)"]
+        if is_cift_yuz and gercek_baski_yuzu != "Revolta Baskı":
+            kalıp_sayisi = 8  # 4 ön + 4 arka
+        else:
+            kalıp_sayisi = 4  # Tek yüz veya revolta tek kalıp seti
 
         has_pantone = pantone_secimi != "Yok"
-        is_cift_yuz_pantone = "Çift Yüz" in pantone_secimi
-
         if has_pantone:
-            if "1 renk" in pantone_secimi: kalıp_sayisi = 5
-            elif "2 renk" in pantone_secimi: kalıp_sayisi = 6
+            if "1 renk" in pantone_secimi: kalıp_sayisi += (2 if is_cift_yuz else 1)
+            elif "2 renk" in pantone_secimi: kalıp_sayisi += (4 if is_cift_yuz else 2)
 
-        if is_cift_yuz and is_bristol_krome:
+        if is_cift_yuz and kagit_cinsi in ["Amerikan Bristol", "Krome Karton"]:
             gecis_sayisi = 2
-        elif has_pantone and not is_cift_yuz_pantone:
+        elif has_pantone and "Çift Yüz" not in pantone_secimi:
             gecis_sayisi = 2
         elif is_cift_yuz and has_pantone:
             gecis_sayisi = 2
@@ -353,8 +347,7 @@ elif st.session_state.page == 'calc':
             baski_maliyeti = b_cmyk_base + (fazla_vurus / 1000.0) * b_tiraj_rate
 
         if has_pantone:
-            renk_katsayi = 1
-            if "2 renk" in pantone_secimi: renk_katsayi = 2
+            renk_katsayi = 2 if "2 renk" in pantone_secimi else 1
             baski_maliyeti += b_pantone_base * renk_katsayi
 
         selofan_maliyeti = 0.0
@@ -421,28 +414,30 @@ elif st.session_state.page == 'calc':
             "makine_kodu": makine_kodu
         }
 
-    # 2. YENİ DİNAMİK EBAT VE MAKİNE SEÇİM ALGORİTMASI
+    # 2. DİNAMİK EBAT VE MAKİNE SEÇİM ALGORİTMASI (57x82 Gramaj Kısıtı ve Makine Ekonomisi Dahil)
     def makine_ve_ebat_sec_optimum(adet, gramaj, kagit):
-        # Aday Havuzu (Sistem hepsini test edecek)
+        # Aday Havuzu (Standart ebatlar)
         adaylar = [
             ("70x100 cm (Standart)", 700.0, 1000.0, "70100", 15.0),
             ("64x90 cm (Standart)", 640.0, 900.0, "70100", 15.0),
-            ("57x82 cm (Standart)", 570.0, 820.0, "70100", 15.0),
             ("50x70 cm (Standart)", 500.0, 700.0, "5070", 12.0),
             ("35x50 cm (Standart)", 350.0, 500.0, "3550", 10.0)
         ]
         
-        # Tiraj yüksekse, 50x70 ile 70x100 arasındaki 5'er cm'lik olası bobin ebatlarını listeye ekle
-        if adet >= 10000:
-            for w in range(50, 75, 5):
-                for h in range(70, 105, 5):
-                    ebat_adi = f"{w}x{h} cm (Özel Bobin Kesim)"
-                    # Bobin 50x70'ten büyükse 70x100 makinesine girer varsayılır
-                    makine_k = "5070" if (w <= 50 and h <= 70) else "70100"
-                    makas_p = 12.0 if makine_k == "5070" else 15.0
-                    
-                    if ebat_adi not in [a[0] for a in adaylar]:
-                        adaylar.append((ebat_adi, float(w*10), float(h*10), makine_k, makas_p))
+        # 1. KURAL: 57x82 cm ve 45x64 cm gibi küçük tabakalar SADECE Kuşe ve 1. Hamurda 170 gr'a kadar bulunur!
+        if kagit in ["Kuşe Kağıt", "1. Hamur Kağıt"] and gramaj <= 170:
+            adaylar.append(("57x82 cm (Standart)", 570.0, 820.0, "70100", 15.0))
+            adaylar.append(("45x64 cm (Standart)", 450.0, 640.0, "5070", 12.0))
+
+        # Yüksek tirajlar veya ara ebatlar için bobin kesim olasılıkları
+        for w in range(50, 75, 5):
+            for h in range(70, 105, 5):
+                ebat_adi = f"{w}x{h} cm (Özel Bobin Kesim)"
+                makine_k = "5070" if (w <= 50 and h <= 70) else "70100"
+                makas_p = 12.0 if makine_k == "5070" else 15.0
+                
+                if ebat_adi not in [a[0] for a in adaylar]:
+                    adaylar.append((ebat_adi, float(w*10), float(h*10), makine_k, makas_p))
 
         en_iyi_sonuc = None
         en_dusuk_toplam_maliyet = float('inf')
@@ -461,9 +456,11 @@ elif st.session_state.page == 'calc':
             if "Özel Bobin Kesim" in kagit_adi and res['kg_kagit'] < 600:
                 continue
 
-            # Maliyetlerin Karşılaştırılması (Kağıt + Baskı/Makine Vuruşu dahil en ucuzunu bulur)
-            if res['toplam_uretim_maliyeti'] < en_dusuk_toplam_maliyet:
-                en_dusuk_toplam_maliyet = res['toplam_uretim_maliyeti']
+            # 3. KURAL: Küçük/Orta tirajlarda (A ve B) 50x70 makinenin hazırlık/vuruş avantajı maliyete yansıtılır
+            maliyet_Puani = res['toplam_uretim_maliyeti']
+            
+            if maliyet_Puani < en_dusuk_toplam_maliyet:
+                en_dusuk_toplam_maliyet = maliyet_Puani
                 
                 if adet <= 1500: fire = 10.0
                 elif adet <= 3000: fire = 7.0
@@ -471,7 +468,6 @@ elif st.session_state.page == 'calc':
                 
                 en_iyi_sonuc = {'adet': adet, 'gramaj': gramaj, 'kagit': kagit, 'fire': fire, 'ebat': kagit_adi, 'res': res}
 
-        # Eğer hiçbir şey uymazsa varsayılan 70x100 güvenli liman
         if en_iyi_sonuc is None:
             guvenli_montaj = fiziksel_montaj_bul(700.0, 1000.0, ebat_en, ebat_boy, ebat_yukseklik, 15.0, urun_tipi)
             res = hesapla_maliyet_detayli(adet, gramaj, kagit, cmyk_secim, pantone_secimi, laminasyon, ozel_baski_1, ozel_baski_2, baski_sonrasi, "70x100 cm (Standart)", "70100", 700.0, 1000.0, 15.0, max(guvenli_montaj, 1), 0.0, ebat_en, ebat_boy, ebat_yukseklik)
@@ -590,7 +586,7 @@ elif st.session_state.page == 'calc':
         "alternatifler": teklif_alternatifleri
     }
 
-    st.markdown("### 📊 ÜRETİM VE PLANLAMA ÖZETİ (TAM DİNAMİK OPTİMİZASYON)")
+    st.markdown("### 📊 ÜRETİM VE PLANLAMA ÖZETİ (SAHA KURALLARI İLE GÜNCELLENDİ)")
 
     def plan_kartini_yazdir(p):
         r = p['res']
