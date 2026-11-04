@@ -493,22 +493,25 @@ elif st.session_state.page == 'calc':
             aday_kagitlar.append(("70x95 cm (70x100 Makine)", 700.0, 950.0, "70100", 15.0))
         else:
             aday_kagitlar.append(("70x100 cm (Standart)", 700.0, 1000.0, "70100", 15.0))
-            aday_kagitlar.append(("50x70 cm (Standart)", 500.0, 700.0, "5070", 12.0))
-            aday_kagitlar.append(("35x50 cm (Standart)", 350.0, 500.0, "3550", 10.0))
+            aday_kagitlar.append(("50x70 cm (50x70 Makine)", 500.0, 700.0, "5070", 12.0))
+            aday_kagitlar.append(("35x50 cm (35x50 Makine)", 350.0, 500.0, "3550", 10.0))
             aday_kagitlar.append(("70x95 cm (Özel Bobin Kesim)", 700.0, 950.0, "70100", 15.0))
             
-            for w_cm in range(30, 105, 5):
-                for h_cm in range(w_cm, 120, 5):
-                    if (w_cm, h_cm) not in [(35,50), (50,70), (70,100), (70,95)]:
-                        if w_cm <= 35 and h_cm <= 50:
-                            makine_k, makas_k = "3550", 10.0
-                        elif w_cm <= 50 and h_cm <= 70:
-                            makine_k, makas_k = "5070", 12.0
-                        elif w_cm <= 100 and h_cm <= 100:
-                            makine_k, makas_k = "70100", 15.0
-                        else:
-                            continue
-                        aday_kagitlar.append((f"{w_cm}x{h_cm} cm (Özel Bobin Kesim)", float(w_cm*10), float(h_cm*10), makine_k, makas_k))
+            # KESİN SINIR: 70x100 cm makine sınırını aşmamak üzere özel bobin kesim ebatları
+            for w_cm in range(30, 75, 5):
+                for h_cm in range(w_cm, 105, 5):
+                    if w_cm <= 35 and h_cm <= 50:
+                        makine_k, makas_k = "3550", 10.0
+                    elif w_cm <= 50 and h_cm <= 70:
+                        makine_k, makas_k = "5070", 12.0
+                    elif w_cm <= 70 and h_cm <= 100:
+                        makine_k, makas_k = "70100", 15.0
+                    else:
+                        continue
+                    
+                    ebat_str = f"{w_cm}x{h_cm} cm (Özel Bobin Kesim)"
+                    if ebat_str not in [x[0] for x in aday_kagitlar]:
+                        aday_kagitlar.append((ebat_str, float(w_cm*10), float(h_cm*10), makine_k, makas_k))
 
         en_iyi_sonuc = None
         en_dusuk_maliyet = float('inf')
@@ -574,7 +577,7 @@ elif st.session_state.page == 'calc':
         "alternatifler": teklif_alternatifleri
     }
 
-    st.markdown("### 📊 ÜRETİM VE PLANLAMA ÖZETİ (DİP KİLİT / YAPIŞTIRMA ÖZEL FORMÜLLÜ)")
+    st.markdown("### 📊 ÜRETİM VE PLANLAMA ÖZETİ (MAX 70x100 SINIRLI)")
 
     def plan_kartini_yazdir(p):
         r = p['res']
@@ -585,7 +588,7 @@ elif st.session_state.page == 'calc':
         plan_df = pd.DataFrame([
             {"Parametre / Kriter": "Fire Oranı (%)", "Değer": f"%{r['fire_pct']:.1f}"},
             {"Parametre / Kriter": "Brüt Adet", "Değer": f"{r['brut_adet']:,} adet"},
-            {"Parametre / Kriter": "Montaj Planı (Dip Kilit)", "Değer": f"1 Tabakada {r['montaj_adedi']} Ürün ({urun_tipi})"},
+            {"Parametre / Kriter": "Montaj Planı", "Değer": f"1 Tabakada {r['montaj_adedi']} Ürün ({urun_tipi})"},
             {"Parametre / Kriter": "Kullanılan Kağıt (Makine)", "Değer": p['ebat']},
             {"Parametre / Kriter": "Kağıt Kilogram (kg)", "Değer": f"{r['kg_kagit']} kg"},
             {"Parametre / Kriter": "Baskı Adedi Ön Ve Arka", "Değer": f"{r['tabaka_adeti']:,} tabaka"},
