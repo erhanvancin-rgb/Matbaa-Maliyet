@@ -239,7 +239,6 @@ elif st.session_state.page == 'calc':
 
         brut_adet = int(math.ceil(net_adet * (1 + (fire_pct / 100.0))))
         
-        # --- DOĞRU TABAKA EBADI VE KODU BELİRLEME ---
         if "32x45" in basilacak_ebat or "35x50" in basilacak_ebat:
             tab_en, tab_boy = 0.32, 0.45
             ebat_kodu = "3550"
@@ -253,7 +252,6 @@ elif st.session_state.page == 'calc':
             tab_en, tab_boy = 0.32, 0.45
             ebat_kodu = "3550"
 
-        # --- DİNAMİK MONTAJ (SIĞDIRMA) HESABI ---
         en_m = ebat_en / 1000.0
         boy_m = ebat_boy / 1000.0
         fit_h = math.floor((tab_en - 0.02) / (en_m + 0.005)) * math.floor((tab_boy - 0.02) / (boy_m + 0.005))
@@ -282,7 +280,6 @@ elif st.session_state.page == 'calc':
 
         revolta_uygun = kagit_cinsi in ["Kuşe Kağıt", "1. Hamur Kağıt"]
         
-        # --- DOĞRU TİRAJ KADEME HESAPLAMA FORMÜLÜ ---
         b_cmyk_base = params.get(f"b_{ebat_kodu}_cmyk", 2400.0)
         b_pantone_base = params.get(f"b_{ebat_kodu}_pantone", 1200.0)
         b_tiraj_rate = params.get(f"b_{ebat_kodu}_tiraj", 500.0)
@@ -444,150 +441,20 @@ elif st.session_state.page == 'calc':
 
     st.markdown("---")
 
-    # --- AKILLI VE EKONOMİK OTOMATİK PLANLAMA SEÇİCİ ---
     def otomatik_planlama_hesapla(adet, gramaj, kagit):
         if adet <= 1500:
             fire = 10.0
-            ebat = "32x45 cm"  # Düşük tirajda ekonomik 35x50 makine (32x45 ebadı)
+            ebat = "32x45 cm"
         elif adet <= 3000:
             fire = 7.0
-            ebat = "32x45 cm"  # 3.000 adetlik orta tirajda da 35x50 ekonomik makine tercih edilir
+            ebat = "32x45 cm"
         else:
             fire = 5.0
-            ebat = "45x64 cm"  # Yüksek tirajda 50x70 makine (45x64 ebadı) seri üretim
+            ebat = "45x64 cm"
             
         return {'adet': adet, 'gramaj': gramaj, 'kagit': kagit, 'fire': fire, 'ebat': ebat}
 
     plan_params = []
     
     plan_params.append({**otomatik_planlama_hesapla(net_a, gramaj_a, kagit_cinsi_a), 'kod': 'A1'})
-    plan_params.append({**otomatik_planlama_hesapla(net_b, gramaj_a, kagit_cinsi_a), 'kod': 'B1'})
-    plan_params.append({**otomatik_planlama_hesapla(net_c, gramaj_a, kagit_cinsi_a), 'kod': 'C1'})
-
-    if ikinci_kagit_var:
-        plan_params.append({**otomatik_planlama_hesapla(net_a, gramaj_b, kagit_cinsi_b), 'kod': 'A2'})
-        plan_params.append({**otomatik_planlama_hesapla(net_b, gramaj_b, kagit_cinsi_b), 'kod': 'B2'})
-        plan_params.append({**otomatik_planlama_hesapla(net_c, gramaj_b, kagit_cinsi_b), 'kod': 'C2'})
-
-    kar_orani = st.slider("Hedef Kar Marjı (%)", 0, 100, 30)
-
-    teklif_alternatifleri = []
-    
-    for p in plan_params:
-        res = hesapla_maliyet_detayli(
-            p['adet'], p['gramaj'], p['kagit'], cmyk_secim, pantone_sayisi, 
-            laminasyon, ozel_baski_1, ozel_baski_2, baski_sonrasi, p['ebat'], 
-            p['fire'], ebat_en, ebat_boy, ebat_yukseklik
-        )
-        p['res'] = res
-        teklif_alternatifleri.append(p)
-
-    ozel_baski_ozet = ", ".join([ob for ob in [ozel_baski_1, ozel_baski_2] if ob != "Yok"]) or "Yok"
-    st.session_state.teklif_data = {
-        "firma_adi": firma_adi,
-        "urun_adi": urun_adi,
-        "urun_tipi": urun_tipi,
-        "ebat_en": ebat_en,
-        "ebat_boy": ebat_boy,
-        "ebat_yukseklik": ebat_yukseklik,
-        "cmyk_secim": cmyk_secim,
-        "pantone_sayisi": pantone_sayisi,
-        "laminasyon": laminasyon,
-        "baski_sonrasi": baski_sonrasi,
-        "ozel_baski": ozel_baski_ozet,
-        "ozel_istekler": ozel_istekler,
-        "kar_orani": kar_orani,
-        "alternatifler": teklif_alternatifleri
-    }
-
-    st.markdown("### 📊 ÜRETİM VE PLANLAMA ÖZETİ (EXCEL ŞABLONU GÖRÜNÜMÜ)")
-
-    def plan_kartini_yazdir(p):
-        r = p['res']
-        net_kullanici_adeti = p['adet']
-        
-        st.markdown(f"**Kağıt & Adet:** {net_kullanici_adeti:,} adet - {p['gramaj']}g {p['kagit']}")
-        
-        plan_df = pd.DataFrame([
-            {"Parametre / Kriter": "Fire Oranı (%)", "Değer": f"%{r['fire_pct']:.1f}"},
-            {"Parametre / Kriter": "Brüt Adet", "Değer": f"{r['brut_adet']:,} adet"},
-            {"Parametre / Kriter": "Montaj Planı", "Değer": f"1 Tabakada {r['montaj_adedi']} İmalat"},
-            {"Parametre / Kriter": "Basılacak Kağıdın Ebadı", "Değer": p['ebat']},
-            {"Parametre / Kriter": "Kağıt Kilogram (kg)", "Değer": f"{r['kg_kagit']} kg"},
-            {"Parametre / Kriter": "Baskı Adedi Ön Ve Arka", "Değer": f"{r['tabaka_adeti']:,} tabaka"},
-            {"Parametre / Kriter": "Baskı Metodu", "Değer": "Revolta" if r['revolta_uygun'] and cmyk_secim == "Çift Yüz" else "Standart Ofset"},
-            {"Parametre / Kriter": "Kaç M2", "Değer": f"{r['toplam_m2']:,.2f} m²"}
-        ])
-        
-        st.table(plan_df)
-
-    if ikinci_kagit_var:
-        st.markdown("#### 🔹 Kağıt A Alternatifleri")
-        col_p1, col_p2, col_p3 = st.columns(3)
-        with col_p1: 
-            st.markdown("##### Alternatif A1")
-            plan_kartini_yazdir(teklif_alternatifleri[0])
-        with col_p2: 
-            st.markdown("##### Alternatif B1")
-            plan_kartini_yazdir(teklif_alternatifleri[1])
-        with col_p3: 
-            st.markdown("##### Alternatif C1")
-            plan_kartini_yazdir(teklif_alternatifleri[2])
-
-        st.markdown("---")
-        st.markdown("#### 🔸 Kağıt B (2. İhtimal) Alternatifleri")
-        col_p4, col_p5, col_p6 = st.columns(3)
-        with col_p4: 
-            st.markdown("##### Alternatif A2")
-            plan_kartini_yazdir(teklif_alternatifleri[3])
-        with col_p5: 
-            st.markdown("##### Alternatif B2")
-            plan_kartini_yazdir(teklif_alternatifleri[4])
-        with col_p6: 
-            st.markdown("##### Alternatif C2")
-            plan_kartini_yazdir(teklif_alternatifleri[5])
-    else:
-        col_p1, col_p2, col_p3 = st.columns(3)
-        with col_p1: 
-            st.markdown("##### Alternatif A")
-            plan_kartini_yazdir(teklif_alternatifleri[0])
-        with col_p2: 
-            st.markdown("##### Alternatif B")
-            plan_kartini_yazdir(teklif_alternatifleri[1])
-        with col_p3: 
-            st.markdown("##### Alternatif C")
-            plan_kartini_yazdir(teklif_alternatifleri[2])
-
-    st.markdown("---")
-    st.markdown("### 🛠️ MATBAA PLANLAMA DETAYLARI (OTOMATİK HESAPLAMA)")
-    
-    if ikinci_kagit_var:
-        st.info("💡 2. Kağıt seçimi aktif olduğu için sistem tarafından otomatik hesaplanan 3x2 blok halinde toplam 6 adet planlama alternatifi gösterilmektedir.")
-    else:
-        st.info("💡 Sistem tarafından otomatik hesaplanan 3 adet planlama alternatifi gösterilmektedir.")
-
-    st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("📄 Müşteri İçin Hazır Fiyat Teklif Sayfasına Git", use_container_width=True, key="calc_to_teklif"):
-        go_page('teklif')
-        st.rerun()
-
-# ==========================================
-# MENÜ 4: MÜŞTERİ FİYAT TEKLİF SAYFASI
-# ==========================================
-elif st.session_state.page == 'teklif':
-    st.subheader("📄 Müşteri Fiyat Teklifi ve Ürün Şartnamesi")
-    
-    if st.session_state.teklif_data is None:
-        st.warning("⚠️ Henüz bir hesaplama yapılmadı. Lütfen önce 'Fiyat Çıkart' modülünden ürün hesaplamasını gerçekleştirin.")
-        if st.button("Forma Dön ve Hesapla", key="teklif_to_calc"):
-            go_page('calc')
-            st.rerun()
-    else:
-        td = st.session_state.teklif_data
-        kar_orani = td['kar_orani']
-
-        st.markdown("<div style='background-color: #f8f9fa; padding: 20px; border-radius: 10px; border-left: 5px solid #1F4E78;'>"
-                    "<h3 style='margin: 0; color: #1F4E78;'>OFFICIAL PRICE QUOTATION / FİYAT TEKLİF MEKTUBU</h3>"
-                    f"<p style='margin: 5px 0 0 0;'><strong>Sayın:</strong> {td['firma_adi']}</p>"
-                    "<p style='margin: 2px 0 0 0;'><strong>Tarih:</strong> 03 Kasım 2026 | <strong>Teklif No:</strong> OFF-2026-8492</p>"
-                    "</div>", unsafe
+    plan_params.append({**otomatik_planlama_hesapla(net_b
