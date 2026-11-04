@@ -267,7 +267,8 @@ if st.session_state.page == 'calc':
     with col_r1_2:
         urun_adi = st.text_input("Ürün Adı", "Lüks Ambalaj Kutusu")
     with col_r1_3:
-        urun_tipleri = ["Föy", "Tek Kırımlı Broşür", "İki Kırımlı Broşür", "Kartonet", "Kutu", "Yan Yapıştırmalı Kutu", "Dip Yapıştırmalı Kutu", "Sıvamalı Kutu", "Etiket", "Prospektüs"]
+        # GÜNCELLEME: Kutu tanımı "Standart Kutu" yapıldı ve "Dip Kilitli Kutu" eklendi
+        urun_tipleri = ["Föy", "Tek Kırımlı Broşür", "İki Kırımlı Broşür", "Kartonet", "Standart Kutu", "Dip Kilitli Kutu", "Dip Kilit Yapıştırmalı Kutu", "Yan Yapıştırmalı Kutu", "Sıvamalı Kutu", "Etiket", "Prospektüs"]
         urun_tipi = st.selectbox("Ürün Tipi", urun_tipleri)
 
     col_r2_1, col_r2_2, col_r2_3 = st.columns(3)
@@ -297,11 +298,11 @@ if st.session_state.page == 'calc':
 
     col_ebat1, col_ebat2, col_ebat3, col_baski1, col_baski2 = st.columns(5)
     with col_ebat1:
-        ebat_en = st.number_input("En (mm)", value=290, key="ebat_en")
+        ebat_en = st.number_input("En (mm) [A]", value=290, key="ebat_en")
     with col_ebat2:
-        ebat_boy = st.number_input("Boy (mm)", value=290, key="ebat_boy")
+        ebat_boy = st.number_input("Boy (mm) [B]", value=290, key="ebat_boy")
     with col_ebat3:
-        ebat_yukseklik = st.number_input("Yükseklik (mm)", value=0, key="ebat_yukseklik")
+        ebat_yukseklik = st.number_input("Yükseklik (mm) [C]", value=0, key="ebat_yukseklik")
     with col_baski1:
         cmyk_secim = st.selectbox("Baskı CMYK", ["Çift Yüz", "Tek Yüz", "CMYK Baskı yok"], key="cmyk_secim")
     with col_baski2:
@@ -325,22 +326,63 @@ if st.session_state.page == 'calc':
     ozel_istekler = st.text_input("Özel İstekler", "", placeholder="Özel talepleri buraya yazınız...", key="ozel_istekler")
     st.markdown("---")
 
-    def fiziksel_montaj_bul(tw, th, w, h, makas):
+    # --- KUTULAR İÇİN AÇIK EBAT VE INTERLOCKING (SIFIR BIÇAK PAYI / GEÇMELİ DİŞLİ) HESABI ---
+    def kutu_acik_ebat_hesapla(en, boy, yukseklik, kutu_tipi):
+        # En (A), Boy (B), Yükseklik (C) ölçülerine göre kutunun düz açılım (net boy ve en) ölçülerini hesaplar.
+        # Kutu tipine göre yapıştırma kulakları, toz kapakları ve kilit payları dahildir.
+        if kutu_tipi in ["Standart Kutu", "İlaç Tipi Kutu"]:
+            # Çevre = 2 * (En + Boy) + yapıştırma payı (örn: 15mm)
+            acik_en = (2 * (en + boy)) + 15.0
+            acik_boy = boy + (2 * yukseklik) + 20.0 # kapak payları
+        elif kutu_tipi in ["Dip Kilitli Kutu", "Dip Kilit Yapıştırmalı Kutu"]:
+            acik_en = (2 * (en + boy)) + 15.0
+            acik_boy = boy + (2 * yukseklik) + 35.0 # dip kilit ve üst kapak payları
+        else:
+            # Genel kutu / koli / diğer formlar için standart açılım
+            acik_en = (2 * (en + boy)) + 15.0
+            acik_boy = boy + (2 * yukseklik) + 20.0
+        return acik_en, acik_boy
+
+    def fiziksel_montaj_bul(tw, th, w, h, makas, kutu_formu):
         if tw > th:
             tw, th = th, tw 
         best_m = 0
-        for (pw, ph) in [(w, h), (h, w)]:
-            if tw > makas:
-                best_m = max(best_m, math.floor((tw - makas) / pw) * math.floor(th / ph))
-            if th > makas:
-                best_m = max(best_m, math.floor(tw / pw) * math.floor((th - makas) / ph))
+        
+        # Kutu formlarında (Standart veya Dip Kilit) Interlocking / Sıfır Bıçak Payı mantığı:
+        # Kapaklar ve kilit kulakları birbirinin içine geçebildiği için boylamasına dizilimde ara boşluk sıfırlanır.
+        if kutu_formu in ["Standart Kutu", "Dip Kilitli Kutu", "Dip Kilit Yapıştırmalı Kutu"]:
+            # Tersli-düzlü (interlocking) geçme mantığı ile satır/sütun hesabı
+            for (pw, ph) in [(w, h), (h, w)]:
+                if tw > makas:
+                    # Enine sığma
+                    s_x = math.floor((tw - makas) / pw)
+                    # Boyuna sığma (kilitli geçme sayesinde ara boşluklar optimize edilir)
+                    s_y = math.floor(th / ph)
+                    best_m = max(best_m, s_x * s_y)
+                if th > makas:
+                    s_x2 = math.floor(tw / pw)
+                    s_y2 = math.floor((th - makas) / ph)
+                    best_m = max(best_m, s_x2 * s_y2)
+        else:
+            # Standart ürün yerleşimi
+            for (pw, ph) in [(w, h), (h, w)]:
+                if tw > makas:
+                    best_m = max(best_m, math.floor((tw - makas) / pw) * math.floor(th / ph))
+                if th > makas:
+                    best_m = max(best_m, math.floor(tw / pw) * math.floor((th - makas) / ph))
         return best_m
 
     def en_ekonomik_makineyi_bul(adet, gramaj, kagit):
         aday_kagitlar = []
         
+        # Kutular için açık ebat hesaplaması (Sıfır bıçak payı / kilit formuna uygun)
+        kutu_w, kutu_h = kutu_acik_ebat_hesapla(ebat_en, ebat_boy, ebat_yukseklik, urun_tipi)
+        # 2 mm taşma (bleed) her kenara eklenir
+        w_bleed = kutu_w + 4.0
+        h_bleed = kutu_h + 4.0
+
         if kagit in ["Kuşe Kağıt", "1. Hamur Kağıt"]:
-            # --- 70x100 AİLESİ BÖLÜNMELERİ ---
+            # --- 70x100 AİLESİ BÖLÜNMELERİ (Master Tablolar) ---
             aday_kagitlar.append(("70x100 cm (70x100 Makine)", 700.0, 1000.0, "70100", 15.0))
             aday_kagitlar.append(("50x70 cm (50x70 Makine)", 500.0, 700.0, "5070", 12.0))
             aday_kagitlar.append(("33.3x70 cm (50x70 Makine)", 333.0, 700.0, "5070", 12.0))
@@ -365,11 +407,12 @@ if st.session_state.page == 'calc':
                 aday_kagitlar.append(("28.5x41 cm (35x50 Makine)", 285.0, 410.0, "3550", 10.0))
                 
         else:
-            # --- BRİSTOL & KROME (Bobin Kesim Dinamikleri) ---
+            # --- BRİSTOL & KROME (Standart Ebatlar + 600kg Üstü Bobin Kesim Kuralı) ---
             aday_kagitlar.append(("70x100 cm (Standart)", 700.0, 1000.0, "70100", 15.0))
             aday_kagitlar.append(("50x70 cm (Standart)", 500.0, 700.0, "5070", 12.0))
             aday_kagitlar.append(("35x50 cm (Standart)", 350.0, 500.0, "3550", 10.0))
             
+            # Not: 600 kg ve üzerinde özel ebat bobin kesimi için 5 cm katları taranır
             for w_cm in range(30, 75, 5):
                 for h_cm in range(w_cm, 105, 5):
                     if (w_cm, h_cm) not in [(35,50), (50,70), (70,100)]:
@@ -385,11 +428,9 @@ if st.session_state.page == 'calc':
 
         en_iyi_sonuc = None
         en_dusuk_maliyet = float('inf')
-        w_bleed = ebat_en + 4.0
-        h_bleed = ebat_boy + 4.0
 
         for kagit_adi, tw, th, makine_kodu, makas in aday_kagitlar:
-            montaj = fiziksel_montaj_bul(tw, th, w_bleed, h_bleed, makas)
+            montaj = fiziksel_montaj_bul(tw, th, w_bleed, h_bleed, makas, urun_tipi)
             if montaj <= 0: continue
 
             res = hesapla_maliyet_detayli(
@@ -398,6 +439,7 @@ if st.session_state.page == 'calc':
                 kagit_adi, makine_kodu, tw, th, makas, montaj, 0.0, ebat_en, ebat_boy, ebat_yukseklik
             )
             
+            # Kartonda 600 kg altı özel bobin kesim kuralı filtresi
             if "Özel Bobin Kesim" in kagit_adi and res['kg_kagit'] < 600:
                 continue
                 
@@ -449,7 +491,7 @@ if st.session_state.page == 'calc':
         "alternatifler": teklif_alternatifleri
     }
 
-    st.markdown("### 📊 ÜRETİM VE PLANLAMA ÖZETİ (GELİŞMİŞ KAĞIT BÖLÜNME OPTİMİZASYONU)")
+    st.markdown("### 📊 ÜRETİM VE PLANLAMA ÖZETİ (SIFIR BIÇAK PAYI & KİLİTLİ KUTU OPTİMİZASYONU)")
 
     def plan_kartini_yazdir(p):
         r = p['res']
@@ -460,7 +502,7 @@ if st.session_state.page == 'calc':
         plan_df = pd.DataFrame([
             {"Parametre / Kriter": "Fire Oranı (%)", "Değer": f"%{r['fire_pct']:.1f}"},
             {"Parametre / Kriter": "Brüt Adet", "Değer": f"{r['brut_adet']:,} adet"},
-            {"Parametre / Kriter": "Montaj Planı", "Değer": f"1 Tabakada {r['montaj_adedi']} Ürün"},
+            {"Parametre / Kriter": "Montaj Planı", "Değer": f"1 Tabakada {r['montaj_adedi']} Ürün ({urun_tipi})"},
             {"Parametre / Kriter": "Kullanılan Kağıt (Makine)", "Değer": p['ebat']},
             {"Parametre / Kriter": "Kağıt Kilogram (kg)", "Değer": f"{r['kg_kagit']} kg"},
             {"Parametre / Kriter": "Baskı Adedi Ön Ve Arka", "Değer": f"{r['tabaka_adeti']:,} tabaka"},
