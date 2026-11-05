@@ -315,6 +315,43 @@ elif st.session_state.page == 'calc':
     ozel_istekler = st.text_input("Özel İstekler", "", placeholder="Özel talepleri buraya yazınız...", key="ozel_istekler")
     st.markdown("---")
 
+    # --- KADEMELİ FIRE HESAPLAMA FONKSİYONU ---
+    def kademeli_fire_hesapla(baski_tabaka_sayisi):
+        # İlk 1000 adet için sabit 100 tabaka
+        # 1000'den sonraki her 1000 adet için kademeli oranlar: %5, %4, %3, sonra %2
+        kalan = baski_tabaka_sayisi
+        fire = 0.0
+        
+        # 0 - 1000 arası
+        dilim_1 = min(kalan, 1000)
+        if dilim_1 > 0:
+            fire += 100.0  # Sabit 100 tabaka
+            kalan -= dilim_1
+            
+        # 1000 - 2000 arası (%5)
+        if kalan > 0:
+            dilim_2 = min(kalan, 1000)
+            fire += dilim_2 * 0.05
+            kalan -= dilim_2
+            
+        # 2000 - 3000 arası (%4)
+        if kalan > 0:
+            dilim_3 = min(kalan, 1000)
+            fire += dilim_3 * 0.04
+            kalan -= dilim_3
+            
+        # 3000 - 4000 arası (%3)
+        if kalan > 0:
+            dilim_4 = min(kalan, 1000)
+            fire += dilim_4 * 0.03
+            kalan -= dilim_4
+            
+        # 4000 ve üzeri (%2)
+        if kalan > 0:
+            fire += kalan * 0.02
+            
+        return math.ceil(fire)
+
     # --- 2 BOYUTLU PLANLAMA VE HESAPLAMA MOTORU ---
     def icsel_2d_planla_ve_hesapla(net_adet, gramaj, kagit):
         params = st.session_state.params
@@ -333,16 +370,12 @@ elif st.session_state.page == 'calc':
             ("57x82 cm", "57x82 cm", 570.0, 820.0, 570.0, 820.0, "70100", 15.0, 1),
         ]
 
-        # Ön kaba ağırlık ve tabaka hesabı ile < 600 kg karton kuralı kontrolü
-        # Önce tüm adaylar içinde en ideal montajı bulalım ki kg hesaplansın
         en_iyi_secim = None
         min_maliyet = float('inf')
 
         for ana_tabaka, baski_ebat_adi, tw, th, ana_w, ana_h, makine_kodu, makas, bolunme_orani in tum_adaylar:
-            
-            # Karton grubu < 600 kg kuralı filtresi: Bristol veya Krome ise 64x90 ve 57x82 ebatlarını eliyoruz (< 600 kg için sadece 70x100 ailesi)
             is_karton = kagit in ["Amerikan Bristol", "Krome Karton"]
-            # Kaba bir kg tahmini veya ilk döngü için tabaka adeti bulalım:
+            
             avail_w = tw - makas
             avail_h = th
             s1_x = int(avail_w // net_w_mm)
@@ -354,15 +387,17 @@ elif st.session_state.page == 'calc':
             montaj = max(adet_1, adet_2)
             if montaj <= 0: continue
 
-            if net_adet <= 1500: fire_pct = 10.0
-            elif net_adet <= 3000: fire_pct = 7.0
-            else: fire_pct = 5.0
+            # Saf net baskı tabaka ihtiyacı (fire hariç)
+            net_baski_tabaka = math.ceil(net_adet / montaj)
+            
+            # Yeni Kademeli Fire Hesabı
+            fire_tabaka = kademeli_fire_hesapla(net_baski_tabaka)
+            brut_baski_tabaka = net_baski_tabaka + fire_tabaka
+            if brut_baski_tabaka < 100: brut_baski_tabaka = 100
 
-            brut_adet = int(math.ceil(net_adet * (1 + (fire_pct / 100.0))))
-            baskiya_giren_tabaka = math.ceil(brut_adet / montaj)
-            if baskiya_giren_tabaka < 100: baskiya_giren_tabaka = 100
-            tabaka_adeti = math.ceil(baskiya_giren_tabaka / bolunme_orani)
+            tabaka_adeti = math.ceil(brut_baski_tabaka / bolunme_orani)
             if tabaka_adeti < 50: tabaka_adeti = 50
+
             baskiya_giren_tabaka_adeti = tabaka_adeti * bolunme_orani
 
             tab_en = ana_w / 1000.0
@@ -370,10 +405,10 @@ elif st.session_state.page == 'calc':
             toplam_m2 = round(tabaka_adeti * tab_en * tab_boy, 2)
             kg_kagit = round((toplam_m2 * gramaj) / 1000.0, 2)
 
-            # Eğer karton ve kg < 600 ise, sadece 70x100 cm ana tabakaya izin ver
+            # Karton grubu < 600 kg kuralı filtresi
             if is_karton and kg_kagit < 600.0:
                 if "70x100" not in ana_tabaka:
-                    continue  # 64x90 veya 57x82'yi atla, sadece 70x100 kullan
+                    continue
 
             if kagit == "Amerikan Bristol": ton_fiyat = params['bristol'] * canli_usd
             elif kagit == "Krome Karton": ton_fiyat = params['krome']
@@ -388,11 +423,16 @@ elif st.session_state.page == 'calc':
             baski_maliyeti = b_cmyk + (fazla_vurus / 1000.0) * b_tiraj
             toplam_maliyet = kagit_maliyeti + baski_maliyeti + 400.0
 
+            # Gerçekleşen brüt ürün adedi (baskı tabaka * montaj)
+            brut_adet = baskiya_giren_tabaka_adeti * montaj
+            fire_pct_ortalama = round((fire_tabaka / max(1, net_baski_tabaka)) * 100.0, 1)
+
             if toplam_maliyet < min_maliyet:
                 min_maliyet = toplam_maliyet
                 en_iyi_secim = {
                     "brut_adet": brut_adet,
-                    "fire_pct": fire_pct,
+                    "fire_pct": fire_pct_ortalama,
+                    "fire_tabaka": fire_tabaka,
                     "montaj_adedi": montaj,
                     "tabaka_adeti": tabaka_adeti,
                     "baskiya_giren_tabaka": baskiya_giren_tabaka_adeti,
@@ -408,7 +448,7 @@ elif st.session_state.page == 'calc':
 
         if en_iyi_secim is None:
             en_iyi_secim = {
-                "brut_adet": net_adet, "fire_pct": 5.0, "montaj_adedi": 1, "tabaka_adeti": net_adet,
+                "brut_adet": net_adet, "fire_pct": 5.0, "fire_tabaka": 100, "montaj_adedi": 1, "tabaka_adeti": net_adet,
                 "baskiya_giren_tabaka": net_adet, "ana_ebat": "70x100 cm", "baski_ebat_str": "35x50 cm",
                 "toplam_m2": 100.0, "kg_kagit": 50.0, "kagit_maliyeti": 1000.0, "baski_maliyeti": 1000.0,
                 "toplam_uretim_maliyeti": 2500.0, "makine_kodu": "3550"
@@ -469,7 +509,7 @@ elif st.session_state.page == 'calc':
         
         st.markdown(f"**Kağıt & Adet:** {net_kullanici_adeti:,} adet - {p['gramaj']}g {secilen_kagit}")
         
-        # --- 4 ALTERNATİFLİ BASKI METODU BELİRLEME MANTIĞI ---
+        # --- BASKI METODU BELİRLEME MANTIĞI ---
         cmyk_on_arka = (cmyk_secim == "Ön&Arka")
         pantone_on_arka = "(Ön&Arka)" in pantone_secimi
         cmyk_yok = (cmyk_secim == "CMYK Baskı yok")
@@ -477,20 +517,16 @@ elif st.session_state.page == 'calc':
 
         kagit_revolta_uygun = secilen_kagit in ["Kuşe Kağıt", "1. Hamur Kağıt"]
 
-        # 1. Seçenek: Baskı Yok
         if cmyk_yok and pantone_yok:
             baski_metodu_str = "Baskı Yok"
-        # 4. Seçenek: Revolta (CMYK veya Pantone Ön&Arka içeriyorsa, montaj çift adet ve kağıt kuşe/1.hamur ise)
         elif (cmyk_on_arka or pantone_on_arka) and (montaj_adedi % 2 == 0) and kagit_revolta_uygun:
             baski_metodu_str = "Revolta"
-        # 3. Seçenek: Ön&Arka
         elif cmyk_on_arka or pantone_on_arka:
             baski_metodu_str = "Ön&Arka"
-        # 2. Seçenek: Tek Yüz
         else:
             baski_metodu_str = "Tek Yüz"
 
-        # --- TABAKA SAYISI VE BASKI ADEDİ / GEÇİŞ SAYISI KURGUSU ---
+        # --- TABAKA SAYISI VE BASKI ADEDİ / GEÇİŞ SAYISI ---
         ham_tabaka = r['baskiya_giren_tabaka']
         final_baski_tabaka = ham_tabaka
         
@@ -510,7 +546,7 @@ elif st.session_state.page == 'calc':
         
         baski_adedi_gecis_str = f"{baski_ifadesi_fmt} tabaka x {gecis_sayisi} geçiş"
 
-        # --- KALIP / RENK SAYISI MANTIK KAPSAMI ---
+        # --- KALIP / RENK SAYISI ---
         p_adet = 0
         if not pantone_yok:
             try:
@@ -521,34 +557,24 @@ elif st.session_state.page == 'calc':
         cmyk_aktif = not cmyk_yok
         pantone_aktif = not pantone_yok
 
-        if not cmyk_aktif:
-            cmyk_kalip = 0
-        elif cmyk_secim == "Ön&Arka" and baski_metodu_str != "Revolta":
-            cmyk_kalip = 8
-        else:
-            cmyk_kalip = 4
+        if not cmyk_aktif: cmyk_kalip = 0
+        elif cmyk_secim == "Ön&Arka" and baski_metodu_str != "Revolta": cmyk_kalip = 8
+        else: cmyk_kalip = 4
 
-        if not pantone_aktif:
-            pantone_kalip = 0
-        elif pantone_on_arka and baski_metodu_str != "Revolta":
-            pantone_kalip = p_adet * 2
-        else:
-            pantone_kalip = p_adet
+        if not pantone_aktif: pantone_kalip = 0
+        elif pantone_on_arka and baski_metodu_str != "Revolta": pantone_kalip = p_adet * 2
+        else: pantone_kalip = p_adet
 
-        if cmyk_aktif and not pantone_aktif:
-            kalip_metni = f"{cmyk_kalip} Kalıp"
-        elif not cmyk_aktif and pantone_aktif:
-            kalip_metni = f"{pantone_kalip} Kalıp"
-        elif cmyk_aktif and pantone_aktif:
-            kalip_metni = f"{cmyk_kalip}+{pantone_kalip} Kalıp"
-        else:
-            kalip_metni = "0 Kalıp"
+        if cmyk_aktif and not pantone_aktif: kalip_metni = f"{cmyk_kalip} Kalıp"
+        elif not cmyk_aktif and pantone_aktif: kalip_metni = f"{pantone_kalip} Kalıp"
+        elif cmyk_aktif and pantone_aktif: kalip_metni = f"{cmyk_kalip}+{pantone_kalip} Kalıp"
+        else: kalip_metni = "0 Kalıp"
 
         baski_ebat_detay = f"{kalip_metni} {r['baski_ebat_str']}" if baski_metodu_str != "Baskı Yok" else f"0 Kalıp {r['baski_ebat_str']}"
 
         plan_df = pd.DataFrame([
-            {"Parametre / Kriter": "Fire Oranı (%)", "Değer": f"%{r['fire_pct']:.1f}"},
-            {"Parametre / Kriter": "Brüt Adet", "Değer": f"{r['brut_adet']:,} adet"},
+            {"Parametre / Kriter": "Fire Tabaka / Oranı", "Değer": f"{r['fire_tabaka']} Tabaka (Ort. %{r['fire_pct']})"},
+            {"Parametre / Kriter": "Brüt Ürün Adedi", "Değer": f"{r['brut_adet']:,} adet"},
             {"Parametre / Kriter": "Montaj Planı", "Değer": f"1 Tabakada {r['montaj_adedi']} Ürün ({urun_tipi})"},
             {"Parametre / Kriter": "Ana Tabaka Ebadı ve Sayısı", "Değer": f"{r['ana_ebat']} {tabaka_fmt} Tabaka"},
             {"Parametre / Kriter": "Baskı Ebadı ve Sayısı", "Değer": baski_ebat_detay},
