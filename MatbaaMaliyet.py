@@ -476,7 +476,7 @@ elif st.session_state.page == 'calc':
         # 1. Seçenek: Baskı Yok
         if cmyk_yok and pantone_yok:
             baski_metodu_str = "Baskı Yok"
-        # 4. Seçenek: Revolta (Ön&Arka/Pantone Ön&Arka ve montaj adedi çift rakam ise)
+        # 4. Seçenek: Revolta (Ön&Arka veya Pantone Ön&Arka ve montaj adedi çift rakam ise)
         elif (cmyk_on_arka or pantone_on_arka) and (montaj_adedi % 2 == 0):
             baski_metodu_str = "Revolta"
         # 3. Seçenek: Ön&Arka (Ön&Arka seçili ama revolta değilse)
@@ -486,12 +486,24 @@ elif st.session_state.page == 'calc':
         else:
             baski_metodu_str = "Tek Yüz"
 
-        gecis_sayisi = 1
-        if baski_metodu_str in ["Ön&Arka", "Revolta"]:
+        # --- TABAKA SAYISI VE GEÇİŞ SAYISI KUSURSUZ KURGUSU ---
+        # Revolta ise tabaka sayısı 2 katına çıkar, geçiş 1 olur.
+        # Ön&Arka ise tabaka sayısı aynı kalır, geçiş 2 olur.
+        # Tek Yüz veya Baskı Yok ise tabaka sayısı aynı kalır, geçiş 1 olur.
+        
+        ham_tabaka = r['baskiya_giren_tabaka']
+        if baski_metodu_str == "Revolta":
+            final_baski_tabaka = ham_tabaka * 2
+            gecis_sayisi = 1
+        elif baski_metodu_str == "Ön&Arka":
+            final_baski_tabaka = ham_tabaka
             gecis_sayisi = 2
+        else:
+            final_baski_tabaka = ham_tabaka
+            gecis_sayisi = 1
 
         tabaka_fmt = f"{r['tabaka_adeti']:,}".replace(',', '.')
-        baski_tabaka_fmt = f"{r['baskiya_giren_tabaka']:,}".replace(',', '.')
+        baski_tabaka_fmt = f"{final_baski_tabaka:,}".replace(',', '.')
         baski_adedi_gecis_str = f"{baski_tabaka_fmt} tabaka x {gecis_sayisi} geçiş"
 
         # --- KALIP / RENK SAYISI MANTIK KAPSAMI ---
