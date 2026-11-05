@@ -322,7 +322,7 @@ elif st.session_state.page == 'calc':
         net_w_mm = ebat_en + 3.0
         net_h_mm = ebat_boy + 3.0
 
-        adaylar = [
+        tum_adaylar = [
             ("64x90 cm", "32x45 cm", 320.0, 450.0, 640.0, 900.0, "3550", 10.0, 4),
             ("64x90 cm", "45x64 cm", 450.0, 640.0, 640.0, 900.0, "5070", 12.0, 2),
             ("64x90 cm", "64x90 cm", 640.0, 900.0, 640.0, 900.0, "70100", 15.0, 1),
@@ -333,43 +333,47 @@ elif st.session_state.page == 'calc':
             ("57x82 cm", "57x82 cm", 570.0, 820.0, 570.0, 820.0, "70100", 15.0, 1),
         ]
 
+        # Ön kaba ağırlık ve tabaka hesabı ile < 600 kg karton kuralı kontrolü
+        # Önce tüm adaylar içinde en ideal montajı bulalım ki kg hesaplansın
         en_iyi_secim = None
         min_maliyet = float('inf')
 
-        for ana_tabaka, baski_ebat_adi, tw, th, ana_w, ana_h, makine_kodu, makas, bolunme_orani in adaylar:
+        for ana_tabaka, baski_ebat_adi, tw, th, ana_w, ana_h, makine_kodu, makas, bolunme_orani in tum_adaylar:
+            
+            # Karton grubu < 600 kg kuralı filtresi: Bristol veya Krome ise 64x90 ve 57x82 ebatlarını eliyoruz (< 600 kg için sadece 70x100 ailesi)
+            is_karton = kagit in ["Amerikan Bristol", "Krome Karton"]
+            # Kaba bir kg tahmini veya ilk döngü için tabaka adeti bulalım:
             avail_w = tw - makas
             avail_h = th
-            
             s1_x = int(avail_w // net_w_mm)
             s1_y = int(avail_h // net_h_mm)
             adet_1 = s1_x * s1_y
-
             s2_x = int(avail_w // net_h_mm)
             s2_y = int(avail_h // net_w_mm)
             adet_2 = s2_x * s2_y
-
             montaj = max(adet_1, adet_2)
-            if montaj <= 0:
-                continue
+            if montaj <= 0: continue
 
             if net_adet <= 1500: fire_pct = 10.0
             elif net_adet <= 3000: fire_pct = 7.0
             else: fire_pct = 5.0
 
             brut_adet = int(math.ceil(net_adet * (1 + (fire_pct / 100.0))))
-            
             baskiya_giren_tabaka = math.ceil(brut_adet / montaj)
             if baskiya_giren_tabaka < 100: baskiya_giren_tabaka = 100
-
             tabaka_adeti = math.ceil(baskiya_giren_tabaka / bolunme_orani)
             if tabaka_adeti < 50: tabaka_adeti = 50
-
             baskiya_giren_tabaka_adeti = tabaka_adeti * bolunme_orani
 
             tab_en = ana_w / 1000.0
             tab_boy = ana_h / 1000.0
             toplam_m2 = round(tabaka_adeti * tab_en * tab_boy, 2)
             kg_kagit = round((toplam_m2 * gramaj) / 1000.0, 2)
+
+            # Eğer karton ve kg < 600 ise, sadece 70x100 cm ana tabakaya izin ver
+            if is_karton and kg_kagit < 600.0:
+                if "70x100" not in ana_tabaka:
+                    continue  # 64x90 veya 57x82'yi atla, sadece 70x100 kullan
 
             if kagit == "Amerikan Bristol": ton_fiyat = params['bristol'] * canli_usd
             elif kagit == "Krome Karton": ton_fiyat = params['krome']
@@ -378,12 +382,10 @@ elif st.session_state.page == 'calc':
             else: ton_fiyat = params['bristol'] * canli_usd
 
             kagit_maliyeti = (kg_kagit / 1000.0) * ton_fiyat
-
             b_cmyk = params.get(f"b_{makine_kodu}_cmyk", 3500.0)
             b_tiraj = params.get(f"b_{makine_kodu}_tiraj", 800.0)
             fazla_vurus = max(0, baskiya_giren_tabaka_adeti - 2000)
             baski_maliyeti = b_cmyk + (fazla_vurus / 1000.0) * b_tiraj
-
             toplam_maliyet = kagit_maliyeti + baski_maliyeti + 400.0
 
             if toplam_maliyet < min_maliyet:
@@ -481,7 +483,7 @@ elif st.session_state.page == 'calc':
         # 4. Seçenek: Revolta (CMYK veya Pantone Ön&Arka içeriyorsa, montaj çift adet ve kağıt kuşe/1.hamur ise)
         elif (cmyk_on_arka or pantone_on_arka) and (montaj_adedi % 2 == 0) and kagit_revolta_uygun:
             baski_metodu_str = "Revolta"
-        # 3. Seçenek: Ön&Arka (Ön&Arka var ama revolta şartları sağlanmıyorsa)
+        # 3. Seçenek: Ön&Arka
         elif cmyk_on_arka or pantone_on_arka:
             baski_metodu_str = "Ön&Arka"
         # 2. Seçenek: Tek Yüz
@@ -508,7 +510,7 @@ elif st.session_state.page == 'calc':
         
         baski_adedi_gecis_str = f"{baski_ifadesi_fmt} tabaka x {gecis_sayisi} geçiş"
 
-        # --- KALIP / RENK SAYISI MANTIK KAPSAMI (CMYK VE PANTONE BAĞIMSIZ HESAPLAMA) ---
+        # --- KALIP / RENK SAYISI MANTIK KAPSAMI ---
         p_adet = 0
         if not pantone_yok:
             try:
@@ -519,23 +521,20 @@ elif st.session_state.page == 'calc':
         cmyk_aktif = not cmyk_yok
         pantone_aktif = not pantone_yok
 
-        # CMYK Kalıp Sayısı
         if not cmyk_aktif:
             cmyk_kalip = 0
         elif cmyk_secim == "Ön&Arka" and baski_metodu_str != "Revolta":
-            cmyk_kalip = 8  # Ön ve Arka ayrı kalıp
+            cmyk_kalip = 8
         else:
-            cmyk_kalip = 4  # Tek Yüz veya Revolta
+            cmyk_kalip = 4
 
-        # Pantone Kalıp Sayısı
         if not pantone_aktif:
             pantone_kalip = 0
         elif pantone_on_arka and baski_metodu_str != "Revolta":
-            pantone_kalip = p_adet * 2  # Ön ve Arka ayrı kalıp
+            pantone_kalip = p_adet * 2
         else:
-            pantone_kalip = p_adet  # Tek Yüz veya Revolta
+            pantone_kalip = p_adet
 
-        # Toplam Kalıp Metni Oluşturma
         if cmyk_aktif and not pantone_aktif:
             kalip_metni = f"{cmyk_kalip} Kalıp"
         elif not cmyk_aktif and pantone_aktif:
