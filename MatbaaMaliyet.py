@@ -486,24 +486,29 @@ elif st.session_state.page == 'calc':
         else:
             baski_metodu_str = "Tek Yüz"
 
-        # --- TABAKA SAYISI VE GEÇİŞ SAYISI KUSURSUZ KURGUSU ---
-        # Revolta durumunda tabaka sayısı DEĞİŞMEZ (aynı kalır), sadece geçiş 1 olur.
-        # Ön&Arka durumunda tabaka sayısı aynı kalır, geçiş 2 olur.
-        # Tek Yüz veya Baskı Yok ise tabaka sayısı aynı kalır, geçiş 1 olur.
+        # --- TABAKA SAYISI VE BASKI ADEDİ / GEÇİŞ SAYISI KURGUSU ---
+        # Revolta durumunda fiziksel kağıt tabaka sayısı AYNI kalır, 
+        # ancak baskı yüzeyi / vuruş adedi iki katına çıkarak gösterilir (örn: 1.752 tabaka x 2 baskı / geçiş veya mantıksal vuruş)
+        # Ön&Arka durumunda kağıt tabaka sayısı aynı kalır, 2 geçiş yazılır.
         
         ham_tabaka = r['baskiya_giren_tabaka']
         final_baski_tabaka = ham_tabaka
         
         if baski_metodu_str == "Revolta":
+            baski_ifadesi_adet = ham_tabaka * 2  # Baskı yüzeyi/vuruş sayısı 2 katına çıkar
             gecis_sayisi = 1
         elif baski_metodu_str == "Ön&Arka":
+            baski_ifadesi_adet = ham_tabaka
             gecis_sayisi = 2
         else:
+            baski_ifadesi_adet = ham_tabaka
             gecis_sayisi = 1
 
         tabaka_fmt = f"{r['tabaka_adeti']:,}".replace(',', '.')
         baski_tabaka_fmt = f"{final_baski_tabaka:,}".replace(',', '.')
-        baski_adedi_gecis_str = f"{baski_tabaka_fmt} tabaka x {gecis_sayisi} geçiş"
+        baski_ifadesi_fmt = f"{baski_ifadesi_adet:,}".replace(',', '.')
+        
+        baski_adedi_gecis_str = f"{baski_ifadesi_fmt} tabaka x {gecis_sayisi} geçiş"
 
         # --- KALIP / RENK SAYISI MANTIK KAPSAMI ---
         p_adet = 0
@@ -651,7 +656,7 @@ elif st.session_state.page == 'teklif':
                 "Ana Tabaka": res['ana_ebat'],
                 "Kağıt Ağırlığı": f"{res['kg_kagit']} kg",
                 "Birim Satış Fiyatı (TL)": f"₺{birim_satis_tl:,.4f}",
-                "Karlı Toplam Tutar (TL)": f"₺{toplam_satis_tl:,.2f}"
+                "Karlı Toplam Tutar (TL)": f"₺{toplam_sait_tl:,.2f}" if 'toplam_sait_tl' in locals() else f"₺{toplam_satis_tl:,.2f}"
             })
 
         df_teklif = pd.DataFrame(table_rows)
