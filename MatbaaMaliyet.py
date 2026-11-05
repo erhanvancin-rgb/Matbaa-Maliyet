@@ -123,7 +123,6 @@ if st.session_state.page == 'home':
 # ==========================================
 elif st.session_state.page == 'params':
     st.subheader("Matbaa Maliyet Parametreleri Fiyat Listesi")
-    # Parametre sayfası aynı formüller (Alan tasarrufu için özetlendi ancak eksiksiz çalışır)
     col1, col2 = st.columns(2)
     with col1:
         st.markdown("#### 1. Kağıt ve Karton Grubu (Ton Maliyetleri)")
@@ -204,6 +203,9 @@ elif st.session_state.page == 'calc':
     with c_ob2: ozel_baski_2 = st.selectbox("Özel Baskılar 2", ["Yok", "Lokal Lak", "Kabartma Lak", "Varak Yaldız"])
     with c_bs: baski_sonrasi = st.selectbox("Baskı Sonrasi", ["Düz Kesim", "Özel kesim", "Kutu Kesim + Yapıştırma"])
 
+    # EKSİK OLAN VE HATAYA SEBEP OLAN SATIR GERİ EKLENDİ
+    ozel_istekler = st.text_input("Özel İstekler", "", placeholder="Özel talepleri buraya yazınız...")
+
     st.markdown("---")
 
     def kademeli_fire_hesapla(baski_tabaka_sayisi):
@@ -219,7 +221,7 @@ elif st.session_state.page == 'calc':
     def get_machine_code(w, h):
         max_dim, min_dim = max(w, h), min(w, h)
         if max_dim > 1020 or min_dim > 720: return None
-        if min_dim < 230: return None # 33.3 veya 25 cm gibi ebatları yakalamak için 230 mm'ye indirildi
+        if min_dim < 230: return None
         if max_dim <= 500 and min_dim <= 350: return "3550"
         elif max_dim <= 700 and min_dim <= 500: return "5070"
         else: return "70100"
@@ -229,7 +231,7 @@ elif st.session_state.page == 'calc':
         elif machine_code == "5070": return 12.0
         else: return 10.0
 
-    # KÖKLÜ ÇÖZÜM 1: AKILLI MONTAJ (INTERLOCK & ALAN OPTİMİZASYONU)
+    # AKILLI MONTAJ (INTERLOCK & ALAN OPTİMİZASYONU)
     def akilli_montaj_hesapla(w_avail, h_avail, ebat_en, ebat_boy, ebat_yuk):
         if not is_kutu:
             w_net = ebat_en + 3.0
@@ -252,7 +254,6 @@ elif st.session_state.page == 'calc':
         teorik_max = int((w_avail * h_avail) / (w_flat * h_step))
         best_montaj = max(m1, m2)
         
-        # Geometri elveriyorsa teorik alan nesting'inin %90'ına ulaşılır (Örn: 600x1000'e 8 adet sığdırma)
         if (w_avail >= w_flat and h_avail >= h_flat) or (w_avail >= h_flat and h_avail >= w_flat):
             heuristic_montaj = int(teorik_max * 0.90)
             if heuristic_montaj > best_montaj:
@@ -260,33 +261,31 @@ elif st.session_state.page == 'calc':
                 
         return best_montaj
 
-    # KÖKLÜ ÇÖZÜM 2: 5 CM (50 MM) BOBİN HASSASİYETİ (84->85 DÜZELTMESİ)
+    # 5 CM (50 MM) BOBİN HASSASİYETİ
     def bobin_adaylarini_uret():
         cands = []
         enler = list(range(550, 1050, 50))
-        boylar = list(range(500, 1050, 50)) # 50, 55, 60... Her adım tam 50 mm (5 cm) katı. 84, 96 ÜRETTİRMEZ!
+        boylar = list(range(500, 1050, 50)) 
         
         for e in enler:
             for b in boylar:
                 ana_w, ana_h = float(e), float(b)
                 ana_isim = f"Bobin Kesim {ana_w/10:g}x{ana_h/10:g} cm"
                 
-                # 1/1 Tam Tabaka (örneğin 60x100)
                 mc1 = get_machine_code(ana_w, ana_h)
                 if mc1: cands.append((ana_isim, f"{ana_w/10:g}x{ana_h/10:g} cm", ana_w, ana_h, ana_w, ana_h, mc1, get_makas(mc1), 1))
                 
-                # 1/2 Bölünmüş (Bobinde genelde sadece 1/1 veya 1/2 mantıklıdır)
                 w2, h2 = ana_w / 2, ana_h / 2
                 mc2 = get_machine_code(w2, ana_h)
                 if mc2: cands.append((ana_isim, f"{w2/10:g}x{ana_h/10:g} cm", ana_w, ana_h, w2, ana_h, mc2, get_makas(mc2), 2))
         return cands
 
-    # --- PLANLAMA VE YARIŞTIRMA MOTORU ---
+    # PLANLAMA VE YARIŞTIRMA MOTORU
     def icsel_planla_ve_hesapla(net_adet, gramaj, kagit):
         params = st.session_state.params
         is_karton = kagit in ["Amerikan Bristol", "Krome Karton"]
         
-        # KÖKLÜ ÇÖZÜM 3: EKSİK STANDART FİRELERİ GERİ YÜKLEME (Körlüğü Bitiren Adım)
+        # EKSİKSİZ STANDART FİRELER
         standart_adaylar = [
             ("70x100 cm", "70x100 cm", 700.0, 1000.0, 700.0, 1000.0, get_machine_code(700.0, 1000.0), get_makas(get_machine_code(700.0, 1000.0)), 1),
             ("70x100 cm", "50x70 cm", 700.0, 1000.0, 500.0, 700.0, get_machine_code(500.0, 700.0), get_makas(get_machine_code(500.0, 700.0)), 2),
@@ -357,7 +356,6 @@ elif st.session_state.page == 'calc':
                         "kg_kagit": kg_kagit, "kagit_maliyeti": kagit_maliyeti, "baski_maliyeti": baski_maliyeti,
                         "toplam_uretim_maliyeti": toplam_maliyet, "makine_kodu": makine_kodu
                     }
-                # Aynı maliyetteyse kağıdı israf etmeyeni seç
                 elif abs(toplam_maliyet - min_maliyet) < 1.0:
                     if kg_kagit < en_iyi_secim['kg_kagit']:
                         min_maliyet = toplam_maliyet
@@ -369,10 +367,8 @@ elif st.session_state.page == 'calc':
                             "toplam_uretim_maliyeti": toplam_maliyet, "makine_kodu": makine_kodu
                         }
 
-        # 1. Standart tabakalar
         adaylari_degerlendir(standart_adaylar)
 
-        # 2. Bobin Yarışması
         geici_kg = en_iyi_secim['kg_kagit'] if en_iyi_secim else 0.0
         if is_karton and geici_kg >= 600.0:
             dinamik_bobinler = bobin_adaylarini_uret()
@@ -421,7 +417,6 @@ elif st.session_state.page == 'calc':
 
     st.markdown("### 📊 ÜRETİM VE PLANLAMA ÖZETİ (NİHAİ MATBAA MATEMATİĞİ)")
 
-    # EKSİKSİZ 10 SATIRLIK TAM DETAY TABLOSU YAZDIRICI
     def plan_kartini_yazdir(p):
         r = p['res']
         net_kullanici_adeti = p['adet']
