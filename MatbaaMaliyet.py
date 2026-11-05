@@ -345,7 +345,7 @@ elif st.session_state.page == 'calc':
             
         return math.ceil(fire)
 
-    # --- PLANLAMA VE HESAPLAMA MOTORU (AKILLI BÖLME VE EKONOMİK EBAT OPTİMİZASYONU) ---
+    # --- PLANLAMA VE HESAPLAMA MOTORU (600 KG KURALI VE DÜZGÜN BOBİN KESİM HAVUZU) ---
     def icsel_planla_ve_hesapla(net_adet, gramaj, kagit):
         params = st.session_state.params
         
@@ -357,134 +357,132 @@ elif st.session_state.page == 'calc':
             acinin_boy = ebat_boy + 3.0
 
         is_karton = kagit in ["Amerikan Bristol", "Krome Karton"]
-        tum_adaylar = []
         
-        if is_karton:
-            karton_ebatlar = [
-                ("70x100 cm", "35x50 cm", 700.0, 1000.0, 350.0, 500.0, "3550", 10.0, 4),
-                ("70x100 cm", "50x70 cm", 700.0, 1000.0, 500.0, 700.0, "5070", 12.0, 2),
-                ("70x100 cm", "70x100 cm", 700.0, 1000.0, 700.0, 1000.0, "70100", 15.0, 1),
-                ("70x100 cm", "33,3x70 cm", 700.0, 1000.0, 333.0, 700.0, "3550", 10.0, 3),
-                ("70x100 cm", "35x65 cm", 700.0, 1000.0, 350.0, 650.0, "3550", 10.0, 4),
-                ("70x100 cm", "35x33,3 cm", 700.0, 1000.0, 350.0, 333.0, "3550", 10.0, 6),
-                ("70x100 cm", "23x50 cm", 700.0, 1000.0, 230.0, 500.0, "3550", 10.0, 6),
-                ("70x100 cm", "25x45 cm", 700.0, 1000.0, 250.0, 450.0, "3550", 10.0, 6),
-            ]
-            
-            seriler = [550, 600, 650, 700]
-            boylar = [600, 650, 700, 750, 800, 850, 900, 950, 1000]
-            for s in seriler:
-                for b in boylar:
-                    if s == 700 and b > 950: continue
-                    mk = "3550" if s <= 500 and b <= 700 else ("5070" if max(s, b) <= 700 else "70100")
-                    bol = 1 if max(s, b) > 700 else 2
-                    karton_ebatlar.append((f"Bobin Kesim {s//10}x{b//10} cm", f"{s//10}x{b//10} cm", float(s), float(b), float(s), float(b), mk, 12.0, bol))
-            
-            tum_adaylar = karton_ebatlar
-        else:
-            kuse_hamur_ebatlar = [
+        # 1. Aşama: Standart Tabaka Ebatları Havuzu (Her koşulda geçerli)
+        standart_adaylar = [
+            ("70x100 cm", "35x50 cm", 700.0, 1000.0, 350.0, 500.0, "3550", 10.0, 4),
+            ("70x100 cm", "50x70 cm", 700.0, 1000.0, 500.0, 700.0, "5070", 12.0, 2),
+            ("70x100 cm", "70x100 cm", 700.0, 1000.0, 700.0, 1000.0, "70100", 15.0, 1),
+            ("70x100 cm", "33,3x70 cm", 700.0, 1000.0, 333.0, 700.0, "3550", 10.0, 3),
+            ("70x100 cm", "35x65 cm", 700.0, 1000.0, 350.0, 650.0, "3550", 10.0, 4),
+            ("70x100 cm", "35x33,3 cm", 700.0, 1000.0, 350.0, 333.0, "3550", 10.0, 6),
+            ("70x100 cm", "23x50 cm", 700.0, 1000.0, 230.0, 500.0, "3550", 10.0, 6),
+            ("70x100 cm", "25x45 cm", 700.0, 1000.0, 250.0, 450.0, "3550", 10.0, 6),
+        ]
+
+        if not is_karton:
+            standart_adaylar.extend([
                 ("64x90 cm", "32x45 cm", 640.0, 900.0, 320.0, 450.0, "3550", 10.0, 4),
                 ("64x90 cm", "45x64 cm", 640.0, 900.0, 450.0, 640.0, "5070", 12.0, 2),
                 ("64x90 cm", "64x90 cm", 640.0, 900.0, 640.0, 900.0, "70100", 15.0, 1),
-                ("70x100 cm", "35x50 cm", 700.0, 1000.0, 350.0, 500.0, "3550", 10.0, 4),
-                ("70x100 cm", "50x70 cm", 700.0, 1000.0, 500.0, 700.0, "5070", 12.0, 2),
-                ("70x100 cm", "70x100 cm", 700.0, 1000.0, 700.0, 1000.0, "70100", 15.0, 1),
-            ]
+            ])
             if gramaj <= 170:
-                kuse_hamur_ebatlar.extend([
+                standart_adaylar.extend([
                     ("57x82 cm", "41x57 cm", 570.0, 820.0, 410.0, 570.0, "5070", 12.0, 2),
                     ("57x82 cm", "57x82 cm", 570.0, 820.0, 570.0, 820.0, "70100", 15.0, 1),
                 ])
-            tum_adaylar = kuse_hamur_ebatlar
 
+        # Önce standart tabakalar üzerinden en iyi montaj ve maliyeti bulalım
         en_iyi_secim = None
         min_maliyet = float('inf')
 
-        for ana_tabaka, baski_ebat_adi, ana_w, ana_h, tw, th, makine_kodu, makas, bolunme_orani in tum_adaylar:
-            avail_w = tw - makas
-            avail_h = th
-            
-            if is_kutu:
-                montaj = 1
-                for sira_w in [1, 2, 3, 4]:
-                    for sira_h in [1, 2, 3, 4]:
-                        m_deneme = sira_w * sira_h
-                        if m_deneme <= 0: continue
-                        
-                        yerlesim_en = acinin_en * sira_w
-                        yerlesim_boy = ((ebat_boy + ebat_yukseklik + 15.0) * sira_h) + ((ebat_yukseklik + 15.0) * 2)
-                        
-                        if (yerlesim_en <= avail_w and yerlesim_boy <= avail_h) or (yerlesim_en <= avail_h and yerlesim_boy <= avail_w):
-                            if m_deneme > montaj:
-                                montaj = m_deneme
-            else:
-                s1_x = int(avail_w // acinin_en)
-                s1_y = int(avail_h // acinin_boy)
-                adet_1 = s1_x * s1_y
+        def adaylari_degerlendir(aday_listesi):
+            nonlocal en_iyi_secim, min_maliyet
+            for ana_tabaka, baski_ebat_adi, ana_w, ana_h, tw, th, makine_kodu, makas, bolunme_orani in aday_listesi:
+                avail_w = tw - makas
+                avail_h = th
+                
+                if is_kutu:
+                    montaj = 1
+                    for sira_w in [1, 2, 3, 4]:
+                        for sira_h in [1, 2, 3, 4]:
+                            m_deneme = sira_w * sira_h
+                            if m_deneme <= 0: continue
+                            
+                            yerlesim_en = acinin_en * sira_w
+                            yerlesim_boy = ((ebat_boy + ebat_yukseklik + 15.0) * sira_h) + ((ebat_yukseklik + 15.0) * 2)
+                            
+                            if (yerlesim_en <= avail_w and yerlesim_boy <= avail_h) or (yerlesim_en <= avail_h and yerlesim_boy <= avail_w):
+                                if m_deneme > montaj:
+                                    montaj = m_deneme
+                else:
+                    s1_x = int(avail_w // acinin_en)
+                    s1_y = int(avail_h // acinin_boy)
+                    adet_1 = s1_x * s1_y
 
-                s2_x = int(avail_w // acinin_boy)
-                s2_y = int(avail_h // acinin_en)
-                adet_2 = s2_x * s2_y
-                montaj = max(adet_1, adet_2)
+                    s2_x = int(avail_w // acinin_boy)
+                    s2_y = int(avail_h // acinin_en)
+                    adet_2 = s2_x * s2_y
+                    montaj = max(adet_1, adet_2)
 
-            if montaj <= 0: continue
+                if montaj <= 0: continue
 
-            net_baski_tabaka = math.ceil(net_adet / montaj)
-            fire_tabaka = kademeli_fire_hesapla(net_baski_tabaka)
-            brut_baski_tabaka = net_baski_tabaka + fire_tabaka
-            if brut_baski_tabaka < 100: brut_baski_tabaka = 100
+                net_baski_tabaka = math.ceil(net_adet / montaj)
+                fire_tabaka = kademeli_fire_hesapla(net_baski_tabaka)
+                brut_baski_tabaka = net_baski_tabaka + fire_tabaka
+                if brut_baski_tabaka < 100: brut_baski_tabaka = 100
 
-            tabaka_adeti = math.ceil(brut_baski_tabaka / bolunme_orani)
-            if tabaka_adeti < 50: tabaka_adeti = 50
+                tabaka_adeti = math.ceil(brut_baski_tabaka / bolunme_orani)
+                if tabaka_adeti < 50: tabaka_adeti = 50
 
-            baskiya_giren_tabaka_adeti = tabaka_adeti * bolunme_orani
+                baskiya_giren_tabaka_adeti = tabaka_adeti * bolunme_orani
 
-            tab_en = ana_w / 1000.0
-            tab_boy = ana_h / 1000.0
-            toplam_m2 = round(tabaka_adeti * tab_en * tab_boy, 2)
-            kg_kagit = round((toplam_m2 * gramaj) / 1000.0, 2)
+                tab_en = ana_w / 1000.0
+                tab_boy = ana_h / 1000.0
+                toplam_m2 = round(tabaka_adeti * tab_en * tab_boy, 2)
+                kg_kagit = round((toplam_m2 * gramaj) / 1000.0, 2)
 
-            # Kağıt alanı / boşa giden alanı minimize eden verimlilik cezası (Akıllı Bölme Optimizasyonu)
-            kagit_alan_m2 = (ana_w / 100.0) * (ana_h / 100.0)
-            urun_kapladigi_alan = montaj * ((acinin_en / 100.0) * (acinin_boy / 100.0))
-            bosluk_orani = max(0.0, 1.0 - (urun_kapladigi_alan / max(0.001, kagit_alan_m2 * bolunme_orani)))
+                if kagit == "Amerikan Bristol": ton_fiyat = params['bristol'] * canli_usd
+                elif kagit == "Krome Karton": ton_fiyat = params['krome']
+                elif kagit == "Kuşe Kağıt": ton_fiyat = params['kuse'] * canli_eur
+                elif kagit == "1. Hamur Kağıt": ton_fiyat = params['hamur'] * canli_usd
+                else: ton_fiyat = params['bristol'] * canli_usd
 
-            if kagit == "Amerikan Bristol": ton_fiyat = params['bristol'] * canli_usd
-            elif kagit == "Krome Karton": ton_fiyat = params['krome']
-            elif kagit == "Kuşe Kağıt": ton_fiyat = params['kuse'] * canli_eur
-            elif kagit == "1. Hamur Kağıt": ton_fiyat = params['hamur'] * canli_usd
-            else: ton_fiyat = params['bristol'] * canli_usd
+                kagit_maliyeti = (kg_kagit / 1000.0) * ton_fiyat
+                b_cmyk = params.get(f"b_{makine_kodu}_cmyk", 3500.0)
+                b_tiraj = params.get(f"b_{makine_kodu}_tiraj", 800.0)
+                fazla_vurus = max(0, baskiya_giren_tabaka_adeti - 2000)
+                baski_maliyeti = b_cmyk + (fazla_vurus / 1000.0) * b_tiraj
+                toplam_maliyet = kagit_maliyeti + baski_maliyeti + 400.0
 
-            kagit_maliyeti = (kg_kagit / 1000.0) * ton_fiyat
-            b_cmyk = params.get(f"b_{makine_kodu}_cmyk", 3500.0)
-            b_tiraj = params.get(f"b_{makine_kodu}_tiraj", 800.0)
-            fazla_vurus = max(0, baskiya_giren_tabaka_adeti - 2000)
-            baski_maliyeti = b_cmyk + (fazla_vurus / 1000.0) * b_tiraj
-            
-            # Verimlilik cezası ile bobin kesimlerde en dar ve ekonomik ebadın seçilmesi sağlanır
-            toplam_maliyet = kagit_maliyeti + baski_maliyeti + 400.0 + (bosluk_orani * 500.0)
+                brut_adet = baskiya_giren_tabaka_adeti * montaj
+                fire_pct_ortalama = round((fire_tabaka / max(1, net_baski_tabaka)) * 100.0, 1)
 
-            brut_adet = baskiya_giren_tabaka_adeti * montaj
-            fire_pct_ortalama = round((fire_tabaka / max(1, net_baski_tabaka)) * 100.0, 1)
+                if toplam_maliyet < min_maliyet:
+                    min_maliyet = toplam_maliyet
+                    en_iyi_secim = {
+                        "brut_adet": brut_adet,
+                        "fire_pct": fire_pct_ortalama,
+                        "fire_tabaka": fire_tabaka,
+                        "montaj_adedi": montaj,
+                        "tabaka_adeti": tabaka_adeti,
+                        "baskiya_giren_tabaka": baskiya_giren_tabaka_adeti,
+                        "ana_ebat": ana_tabaka,
+                        "baski_ebat_str": baski_ebat_adi,
+                        "toplam_m2": toplam_m2,
+                        "kg_kagit": kg_kagit,
+                        "kagit_maliyeti": kagit_maliyeti,
+                        "baski_maliyeti": baski_maliyeti,
+                        "toplam_uretim_maliyeti": toplam_maliyet,
+                        "makine_kodu": makine_kodu
+                    }
 
-            if toplam_maliyet < min_maliyet:
-                min_maliyet = toplam_maliyet
-                en_iyi_secim = {
-                    "brut_adet": brut_adet,
-                    "fire_pct": fire_pct_ortalama,
-                    "fire_tabaka": fire_tabaka,
-                    "montaj_adedi": montaj,
-                    "tabaka_adeti": tabaka_adeti,
-                    "baskiya_giren_tabaka": baskiya_giren_tabaka_adeti,
-                    "ana_ebat": ana_tabaka,
-                    "baski_ebat_str": baski_ebat_adi,
-                    "toplam_m2": toplam_m2,
-                    "kg_kagit": kg_kagit,
-                    "kagit_maliyeti": kagit_maliyeti,
-                    "baski_maliyeti": baski_maliyeti,
-                    "toplam_uretim_maliyeti": toplam_maliyet,
-                    "makine_kodu": makine_kodu
-                }
+        # Önce standart adayları değerlendir
+        adaylari_degerlendir(standart_adaylar)
+
+        # 2. Aşama: 600 KG KURALI
+        # Eğer ilk hesaplanan kg 600 kg ve üzerindeyse, düzgün bobin kesim havuzunu (60x60, 60x90, 70x70 vb. simetrik/verimli ebatlar) devreye sok
+        geici_kg = en_iyi_secim['kg_kagit'] if en_iyi_secim else 0.0
+        
+        if is_karton and geici_kg >= 600.0:
+            bobin_kesim_adaylar = [
+                ("Bobin Kesim 60x60 cm", "60x60 cm", 600.0, 600.0, 600.0, 600.0, "5070", 12.0, 2),
+                ("Bobin Kesim 60x90 cm", "60x90 cm", 600.0, 900.0, 600.0, 900.0, "70100", 15.0, 1),
+                ("Bobin Kesim 70x70 cm", "70x70 cm", 700.0, 700.0, 700.0, 700.0, "70100", 15.0, 1),
+                ("Bobin Kesim 55x55 cm", "55x55 cm", 550.0, 550.0, 550.0, 550.0, "3550", 10.0, 4),
+                ("Bobin Kesim 65x65 cm", "65x65 cm", 650.0, 650.0, 650.0, 650.0, "70100", 15.0, 1),
+            ]
+            adaylari_degerlendir(bobin_kesim_adaylar)
 
         if en_iyi_secim is None:
             en_iyi_secim = {
@@ -539,7 +537,7 @@ elif st.session_state.page == 'calc':
         "alternatifler": teklif_alternatifleri
     }
 
-    st.markdown("### 📊 ÜRETİM VE PLANLAMA ÖZETİ (KUTU AÇINIM VE ALTERNATİF OPTİMİZASYON)")
+    st.markdown("### 📊 ÜRETİM VE PLANLAMA ÖZETİ (KUTU AÇINIM VE 600 KG KURALLI OPTİMİZASYON)")
 
     def plan_kartini_yazdir(p):
         r = p['res']
