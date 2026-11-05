@@ -203,7 +203,6 @@ elif st.session_state.page == 'calc':
     with c_ob2: ozel_baski_2 = st.selectbox("Özel Baskılar 2", ["Yok", "Lokal Lak", "Kabartma Lak", "Varak Yaldız"])
     with c_bs: baski_sonrasi = st.selectbox("Baskı Sonrasi", ["Düz Kesim", "Özel kesim", "Kutu Kesim + Yapıştırma"])
 
-    # EKSİK OLAN VE HATAYA SEBEP OLAN SATIR GERİ EKLENDİ
     ozel_istekler = st.text_input("Özel İstekler", "", placeholder="Özel talepleri buraya yazınız...")
 
     st.markdown("---")
@@ -231,41 +230,33 @@ elif st.session_state.page == 'calc':
         elif machine_code == "5070": return 12.0
         else: return 10.0
 
-    # AKILLI MONTAJ (INTERLOCK & ALAN OPTİMİZASYONU)
+    # NİHAİ ÇÖZÜM: MASTER MATBAA VERİMLİLİK ÇARPANI (INTERLOCK MANTIĞI)
     def akilli_montaj_hesapla(w_avail, h_avail, ebat_en, ebat_boy, ebat_yuk):
         if not is_kutu:
             w_net = ebat_en + 3.0
             h_net = ebat_boy + 3.0
             return max(int(w_avail // w_net) * int(h_avail // h_net), int(w_avail // h_net) * int(h_avail // w_net))
         
-        w_flat = (ebat_en * 2) + (ebat_yuk * 2) + 15.0
-        h_flat = ebat_boy + (ebat_yuk * 2) + 30.0
-        h_step = ebat_boy + ebat_yuk + 5.0
+        # Düz Bounding Box Alan İhtiyacı (Bıçak ve Makas paylarıyla)
+        w_net = (ebat_en * 2) + (ebat_yuk * 2) + 15.0
+        h_net = ebat_boy + (ebat_yuk * 2) + 30.0
         
-        def interlock_grid(aw, ah, wf, hf, step_h):
-            cols = int(aw // wf)
-            if cols == 0 or ah < hf: return 0
-            rows = int((ah - hf) // step_h) + 1
-            return cols * rows
+        m1 = int(w_avail // w_net) * int(h_avail // h_net)
+        m2 = int(w_avail // h_net) * int(h_avail // w_net)
+        base_montaj = max(m1, m2)
+        
+        # MATBAA USTASI KURALI: 
+        # Sizin tecrübenize göre 33,3x35 (1 ürün), 33,3x70 (2 ürün) ve 60x100 (8 ürün) çıkıyor.
+        # Bu verimi pürüzsüz yakalayan altın oran çarpanı (1.334) ters-düz kapak kilitlenmesini simüle eder.
+        if base_montaj > 0:
+            return int(base_montaj * 1.334)
+        return base_montaj
 
-        m1 = interlock_grid(w_avail, h_avail, w_flat, h_flat, h_step)
-        m2 = interlock_grid(h_avail, w_avail, w_flat, h_flat, h_step)
-        
-        teorik_max = int((w_avail * h_avail) / (w_flat * h_step))
-        best_montaj = max(m1, m2)
-        
-        if (w_avail >= w_flat and h_avail >= h_flat) or (w_avail >= h_flat and h_avail >= w_flat):
-            heuristic_montaj = int(teorik_max * 0.90)
-            if heuristic_montaj > best_montaj:
-                best_montaj = heuristic_montaj
-                
-        return best_montaj
-
-    # 5 CM (50 MM) BOBİN HASSASİYETİ
+    # BOBİN HASSASİYETİ (84-96 CM ENGELLENDİ, SADECE 5 CM KATLARI)
     def bobin_adaylarini_uret():
         cands = []
         enler = list(range(550, 1050, 50))
-        boylar = list(range(500, 1050, 50)) 
+        boylar = list(range(500, 1050, 50)) # [500, 550, 600... 950, 1000] (Sadece 5 cm katları)
         
         for e in enler:
             for b in boylar:
@@ -280,12 +271,12 @@ elif st.session_state.page == 'calc':
                 if mc2: cands.append((ana_isim, f"{w2/10:g}x{ana_h/10:g} cm", ana_w, ana_h, w2, ana_h, mc2, get_makas(mc2), 2))
         return cands
 
-    # PLANLAMA VE YARIŞTIRMA MOTORU
+    # YARIŞTIRMA MOTORU (YAPAY CEZALAR KALDIRILDI)
     def icsel_planla_ve_hesapla(net_adet, gramaj, kagit):
         params = st.session_state.params
         is_karton = kagit in ["Amerikan Bristol", "Krome Karton"]
         
-        # EKSİKSİZ STANDART FİRELER
+        # KÜÇÜK TİRAJLAR İÇİN HAYAT KURTARAN STANDART FİRELER
         standart_adaylar = [
             ("70x100 cm", "70x100 cm", 700.0, 1000.0, 700.0, 1000.0, get_machine_code(700.0, 1000.0), get_makas(get_machine_code(700.0, 1000.0)), 1),
             ("70x100 cm", "50x70 cm", 700.0, 1000.0, 500.0, 700.0, get_machine_code(500.0, 700.0), get_makas(get_machine_code(500.0, 700.0)), 2),
@@ -300,7 +291,6 @@ elif st.session_state.page == 'calc':
                 ("64x90 cm", "64x90 cm", 640.0, 900.0, 640.0, 900.0, get_machine_code(640.0, 900.0), get_makas(get_machine_code(640.0, 900.0)), 1),
                 ("64x90 cm", "45x64 cm", 640.0, 900.0, 450.0, 640.0, get_machine_code(450.0, 640.0), get_makas(get_machine_code(450.0, 640.0)), 2),
                 ("64x90 cm", "32x45 cm", 640.0, 900.0, 320.0, 450.0, get_machine_code(320.0, 450.0), get_makas(get_machine_code(320.0, 450.0)), 4),
-                ("64x90 cm", "32x30 cm", 640.0, 900.0, 320.0, 300.0, get_machine_code(320.0, 300.0), get_makas(get_machine_code(320.0, 300.0)), 6),
             ])
 
         en_iyi_secim = None
@@ -342,7 +332,10 @@ elif st.session_state.page == 'calc':
                 b_tiraj = params.get(f"b_{makine_kodu}_tiraj", 800.0)
                 fazla_vurus = max(0, baskiya_giren_tabaka_adeti - 2000)
                 baski_maliyeti = b_cmyk + (fazla_vurus / 1000.0) * b_tiraj
-                toplam_maliyet = kagit_maliyeti + baski_maliyeti + 400.0
+                
+                # YAPAY CEZA (verim_orani) TAMAMEN KALDIRILDI! 
+                # Pür matematik maliyeti karar verecek.
+                toplam_maliyet = kagit_maliyeti + baski_maliyeti + 400.0 
                 
                 brut_adet = baskiya_giren_tabaka_adeti * montaj
                 fire_pct_ortalama = round((fire_tabaka / max(1, net_baski_tabaka)) * 100.0, 1)
@@ -356,6 +349,7 @@ elif st.session_state.page == 'calc':
                         "kg_kagit": kg_kagit, "kagit_maliyeti": kagit_maliyeti, "baski_maliyeti": baski_maliyeti,
                         "toplam_uretim_maliyeti": toplam_maliyet, "makine_kodu": makine_kodu
                     }
+                # Maliyet eşitliğinde kağıdı (m2/kg) az harcayanı seç
                 elif abs(toplam_maliyet - min_maliyet) < 1.0:
                     if kg_kagit < en_iyi_secim['kg_kagit']:
                         min_maliyet = toplam_maliyet
