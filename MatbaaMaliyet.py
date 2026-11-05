@@ -249,11 +249,11 @@ elif st.session_state.page == 'calc':
 
     col_r2_1, col_r2_2, col_r2_3 = st.columns(3)
     with col_r2_1:
-        net_a = st.number_input("Ürün Adedi A", value=10000, step=1000, key="net_a")
+        net_a = st.number_input("Ürün Adedi A", value=1000, step=100, key="net_a")
     with col_r2_2:
-        net_b = st.number_input("Ürün Adedi B", value=20000, step=1000, key="net_b")
+        net_b = st.number_input("Ürün Adedi B", value=2000, step=100, key="net_b")
     with col_r2_3:
-        net_c = st.number_input("Ürün Adedi C", value=50000, step=1000, key="net_c")
+        net_c = st.number_input("Ürün Adedi C", value=5000, step=100, key="net_c")
 
     col_ka_head, col_kb_head = st.columns(2)
     with col_ka_head:
@@ -476,6 +476,10 @@ elif st.session_state.page == 'calc':
         
         st.markdown(f"**Kağıt & Adet:** {net_kullanici_adeti:,} adet - {p['gramaj']}g {p['kagit']}")
         
+        baski_metodu_str = "Çift Yüz" if cmyk_secim == "Çift Yüz" else "Tek Yüz"
+        gecis_sayisi = 2 if cmyk_secim == "Çift Yüz" else 1
+        baski_adedi_gecis_str = f"{f'{r["baskiya_giren_tabaka"]:,}'.replace(',', '.')} tabaka x {gecis_sayisi} geçiş"
+
         plan_df = pd.DataFrame([
             {"Parametre / Kriter": "Fire Oranı (%)", "Değer": f"%{r['fire_pct']:.1f}"},
             {"Parametre / Kriter": "Brüt Adet", "Değer": f"{r['brut_adet']:,} adet"},
@@ -484,6 +488,8 @@ elif st.session_state.page == 'calc':
             {"Parametre / Kriter": "Baskı Ebadı ve Sayısı", "Değer": f"4 Kalıp {r['baski_ebat_str']}"},
             {"Parametre / Kriter": "Baskıya Girecek Kağıt Ebadı ve Sayısı", "Değer": f"{r['baski_ebat_str']} {f'{r["baskiya_giren_tabaka"]:,}'.replace(',', '.')} Tabaka"},
             {"Parametre / Kriter": "Kağıt Kilogram (kg)", "Değer": f"{r['kg_kagit']} kg"},
+            {"Parametre / Kriter": "Baskı Adedi ve Geçiş Sayısı", "Değer": baski_adedi_gecis_str},
+            {"Parametre / Kriter": "Baskı Metodu", "Değer": baski_metodu_str},
             {"Parametre / Kriter": "Kaç M2", "Değer": f"{r['toplam_m2']:,.2f} m²"}
         ])
         
