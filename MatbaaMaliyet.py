@@ -446,7 +446,7 @@ elif st.session_state.page == 'calc':
         if kagit in ["Kuşe Kağıt", "1. Hamur Kağıt"] and gramaj <= 170:
             adaylar.append(("57x82 cm (Tam Tabaka)", 570.0, 820.0, "70100", 15.0))
             adaylar.append(("41x57 cm (2'ye Bölünmüş)", 410.0, 570.0, "5070", 12.0))
-            adaylar.append(("27.3x57 cm (3'e Bölünmüş)", 273.0, 570.0, "5070", 12.0))
+            adaylar.append(("27.3x57 cm (3'e Bölünmüş)", 273.0, 570.0, "3550", 10.0))
 
         # BOBİN KESİM (600 kg ve üzeri için 5'er cm katları)
         for w in range(55, 75, 5):
@@ -618,7 +618,7 @@ elif st.session_state.page == 'calc':
             {"Parametre / Kriter": "Montaj Planı", "Değer": f"1 Tabakada {r['montaj_adedi']} Ürün ({urun_tipi})"},
             {"Parametre / Kriter": "Tabaka Ebadı ve Sayısı", "Değer": f"{p['ebat']} ({r['tabaka_adeti']:,} tabaka)"},
             {"Parametre / Kriter": "Baskı Ebadı ve Sayısı", "Değer": r['baski_kalip_metni']},
-            {"Parametre / Kriter": "Baskıya Girecek Kağıt Ebadı", "Değer": p['ebat']},
+            {"Parametre / Kriter": "Baskıya Girecek Kağıt Ebadı ve Sayısı", "Değer": f"{p['ebat'].split(' (')[0]} {r['tabaka_adeti']:,:,.0f} Tabaka".replace(',', '.')},
             {"Parametre / Kriter": "Kağıt Kilogram (kg)", "Değer": f"{r['kg_kagit']} kg"},
             {"Parametre / Kriter": "Baskı Adedi ve Geçiş Sayısı", "Değer": f"{r['tabaka_adeti']:,} tabaka x {r['gecis_sayisi']} geçiş"},
             {"Parametre / Kriter": "Baskı Metodu", "Değer": r['gercek_baski_yuzu']},
