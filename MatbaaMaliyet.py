@@ -467,16 +467,19 @@ elif st.session_state.page == 'calc':
         
         baski_metodu_str = "Çift Yüz" if cmyk_secim == "Çift Yüz" else "Tek Yüz"
         gecis_sayisi = 2 if cmyk_secim == "Çift Yüz" else 1
-        tabaka_fmt = f"{r['baskiya_giren_tabaka']:,}".replace(',', '.')
-        baski_adedi_gecis_str = f"{tabaka_fmt} tabaka x {gecis_sayisi} geçiş"
+        
+        # Hata veren f-string çakışmaları tamamen temizlendi:
+        tabaka_fmt = f"{r['tabaka_adeti']:,}".replace(',', '.')
+        baski_tabaka_fmt = f"{r['baskiya_giren_tabaka']:,}".replace(',', '.')
+        baski_adedi_gecis_str = f"{baski_tabaka_fmt} tabaka x {gecis_sayisi} geçiş"
 
         plan_df = pd.DataFrame([
             {"Parametre / Kriter": "Fire Oranı (%)", "Değer": f"%{r['fire_pct']:.1f}"},
             {"Parametre / Kriter": "Brüt Adet", "Değer": f"{r['brut_adet']:,} adet"},
             {"Parametre / Kriter": "Montaj Planı", "Değer": f"1 Tabakada {r['montaj_adedi']} Ürün ({urun_tipi})"},
-            {"Parametre / Kriter": "Ana Tabaka Ebadı ve Sayısı", "Değer": f"{r['ana_ebat']} {f'{r[\"tabaka_adeti\"]:,}'.replace(',', '.')} Tabaka"},
+            {"Parametre / Kriter": "Ana Tabaka Ebadı ve Sayısı", "Değer": f"{r['ana_ebat']} {tabaka_fmt} Tabaka"},
             {"Parametre / Kriter": "Baskı Ebadı ve Sayısı", "Değer": f"4 Kalıp {r['baski_ebat_str']}"},
-            {"Parametre / Kriter": "Baskıya Girecek Kağıt Ebadı ve Sayısı", "Değer": f"{r['baski_ebat_str']} {f'{r[\"baskiya_giren_tabaka\"]:,}'.replace(',', '.')} Tabaka"},
+            {"Parametre / Kriter": "Baskıya Girecek Kağıt Ebadı ve Sayısı", "Değer": f"{r['baski_ebat_str']} {baski_tabaka_fmt} Tabaka"},
             {"Parametre / Kriter": "Kağıt Kilogram (kg)", "Değer": f"{r['kg_kagit']} kg"},
             {"Parametre / Kriter": "Baskı Adedi ve Geçiş Sayısı", "Değer": baski_adedi_gecis_str},
             {"Parametre / Kriter": "Baskı Metodu", "Değer": baski_metodu_str},
