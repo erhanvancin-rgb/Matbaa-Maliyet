@@ -467,22 +467,21 @@ elif st.session_state.page == 'calc':
         
         st.markdown(f"**Kağıt & Adet:** {net_kullanici_adeti:,} adet - {p['gramaj']}g {secilen_kagit}")
         
-        # --- BASKI METODU BELİRLEME MANTIĞI (KAĞIT CİNSİ KISITI EKLENDİ) ---
+        # --- 4 ALTERNATİFLİ BASKI METODU BELİRLEME MANTIĞI ---
         cmyk_on_arka = (cmyk_secim == "Ön&Arka")
         pantone_on_arka = "(Ön&Arka)" in pantone_secimi
         cmyk_yok = (cmyk_secim == "CMYK Baskı yok")
         pantone_yok = (pantone_secimi == "Yok")
 
-        # Revolta için kağıt cinsi şartı: Sadece "Kuşe Kağıt" veya "1. Hamur Kağıt" olabilir!
         kagit_revolta_uygun = secilen_kagit in ["Kuşe Kağıt", "1. Hamur Kağıt"]
 
         # 1. Seçenek: Baskı Yok
         if cmyk_yok and pantone_yok:
             baski_metodu_str = "Baskı Yok"
-        # 4. Seçenek: Revolta (Ön&Arka seçili, montaj çift adet ve kağıt kuşe/1.hamur ise)
+        # 4. Seçenek: Revolta (CMYK veya Pantone Ön&Arka içeriyorsa, montaj çift adet ve kağıt kuşe/1.hamur ise)
         elif (cmyk_on_arka or pantone_on_arka) and (montaj_adedi % 2 == 0) and kagit_revolta_uygun:
             baski_metodu_str = "Revolta"
-        # 3. Seçenek: Ön&Arka (Diğer ön&arka durumları veya karton/bristol olduğu için revolta yasaksa)
+        # 3. Seçenek: Ön&Arka (Ön&Arka var ama revolta şartları sağlanmıyorsa)
         elif cmyk_on_arka or pantone_on_arka:
             baski_metodu_str = "Ön&Arka"
         # 2. Seçenek: Tek Yüz
@@ -494,7 +493,7 @@ elif st.session_state.page == 'calc':
         final_baski_tabaka = ham_tabaka
         
         if baski_metodu_str == "Revolta":
-            baski_ifadesi_adet = ham_tabaka * 2  # Baskı yüzeyi/vuruş sayısı 2 katına çıkar
+            baski_ifadesi_adet = ham_tabaka * 2  
             gecis_sayisi = 1
         elif baski_metodu_str == "Ön&Arka":
             baski_ifadesi_adet = ham_tabaka
@@ -509,7 +508,7 @@ elif st.session_state.page == 'calc':
         
         baski_adedi_gecis_str = f"{baski_ifadesi_fmt} tabaka x {gecis_sayisi} geçiş"
 
-        # --- KALIP / RENK SAYISI MANTIK KAPSAMI ---
+        # --- KALIP / RENK SAYISI MANTIK KAPSAMI (CMYK VE PANTONE BAĞIMSIZ HESAPLAMA) ---
         p_adet = 0
         if not pantone_yok:
             try:
@@ -520,21 +519,29 @@ elif st.session_state.page == 'calc':
         cmyk_aktif = not cmyk_yok
         pantone_aktif = not pantone_yok
 
+        # CMYK Kalıp Sayısı
+        if not cmyk_aktif:
+            cmyk_kalip = 0
+        elif cmyk_secim == "Ön&Arka" and baski_metodu_str != "Revolta":
+            cmyk_kalip = 8  # Ön ve Arka ayrı kalıp
+        else:
+            cmyk_kalip = 4  # Tek Yüz veya Revolta
+
+        # Pantone Kalıp Sayısı
+        if not pantone_aktif:
+            pantone_kalip = 0
+        elif pantone_on_arka and baski_metodu_str != "Revolta":
+            pantone_kalip = p_adet * 2  # Ön ve Arka ayrı kalıp
+        else:
+            pantone_kalip = p_adet  # Tek Yüz veya Revolta
+
+        # Toplam Kalıp Metni Oluşturma
         if cmyk_aktif and not pantone_aktif:
-            if baski_metodu_str in ["Tek Yüz", "Revolta", "Baskı Yok"]:
-                kalip_metni = "4 Kalıp"
-            else: # Ön&Arka (Revolta değil)
-                kalip_metni = "8 Kalıp"
+            kalip_metni = f"{cmyk_kalip} Kalıp"
         elif not cmyk_aktif and pantone_aktif:
-            if baski_metodu_str in ["Tek Yüz", "Revolta", "Baskı Yok"]:
-                kalip_metni = f"{p_adet} Kalıp"
-            else:
-                kalip_metni = f"{p_adet * 2} Kalıp"
+            kalip_metni = f"{pantone_kalip} Kalıp"
         elif cmyk_aktif and pantone_aktif:
-            if baski_metodu_str in ["Tek Yüz", "Revolta", "Baskı Yok"]:
-                kalip_metni = f"4+{p_adet} Kalıp"
-            else:
-                kalip_metni = f"8+{p_adet * 2} Kalıp"
+            kalip_metni = f"{cmyk_kalip}+{pantone_kalip} Kalıp"
         else:
             kalip_metni = "0 Kalıp"
 
