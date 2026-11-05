@@ -484,7 +484,17 @@ elif st.session_state.page == 'calc':
                 elif adet <= 3000: fire = 7.0
                 else: fire = 5.0
                 
-                en_iyi_sonuc = {'adet': adet, 'gramaj': gramaj, 'kagit': kagit, 'fire': fire, 'ebat': kagit_adi, 'res': res}
+                # Ana satın alma ebadını belirleme (Saha standardı: 70x100, 64x90, 57x82)
+        if any(x in kagit_adi for x in ["70x100", "50x70", "35x50", "33.3x70", "35x65", "23x50", "25x45"]):
+            ana_ebat = "70x100 cm"
+        elif any(x in kagit_adi for x in ["64x90", "45x64", "30x64", "31x59", "32x45", "21.3x45", "22.5x41.5"]):
+            ana_ebat = "64x90 cm"
+        elif any(x in kagit_adi for x in ["57x82", "41x57", "27.3x57"]):
+            ana_ebat = "57x82 cm"
+        else:
+            ana_ebat = kagit_adi.split(" cm")[0]
+
+        en_iyi_sonuc = {'adet': adet, 'gramaj': gramaj, 'kagit': kagit, 'fire': fire, 'ebat': kagit_adi, 'ana_ebat': ana_ebat, 'res': res}
 
         if en_iyi_sonuc is None:
             guvenli_montaj = fiziksel_montaj_bul(700.0, 1000.0, ebat_en, ebat_boy, ebat_yukseklik, 15.0, urun_tipi)
@@ -616,7 +626,7 @@ elif st.session_state.page == 'calc':
             {"Parametre / Kriter": "Fire Oranı (%)", "Değer": f"%{r['fire_pct']:.1f}"},
             {"Parametre / Kriter": "Brüt Adet", "Değer": f"{r['brut_adet']:,} adet"},
             {"Parametre / Kriter": "Montaj Planı", "Değer": f"1 Tabakada {r['montaj_adedi']} Ürün ({urun_tipi})"},
-            {"Parametre / Kriter": "Tabaka Ebadı ve Sayısı", "Değer": f"{p['ebat']} ({r['tabaka_adeti']:,} tabaka)"},
+            {"Parametre / Kriter": "Ana Tabaka Ebadı ve Sayısı", "Değer": f"{p.get('ana_ebat', '70x100 cm')} {f"{r['tabaka_adeti']:,}".replace(',', '.')} Tabaka"},
             {"Parametre / Kriter": "Baskı Ebadı ve Sayısı", "Değer": r['baski_kalip_metni']},
             {"Parametre / Kriter": "Baskıya Girecek Kağıt Ebadı ve Sayısı", "Değer": f"{p['ebat'].split(' (')[0]} {f"{r['tabaka_adeti']:,}".replace(',', '.')} Tabaka"},
             {"Parametre / Kriter": "Kağıt Kilogram (kg)", "Değer": f"{r['kg_kagit']} kg"},
