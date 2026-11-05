@@ -487,19 +487,18 @@ elif st.session_state.page == 'calc':
             baski_metodu_str = "Tek Yüz"
 
         # --- TABAKA SAYISI VE GEÇİŞ SAYISI KUSURSUZ KURGUSU ---
-        # Revolta ise tabaka sayısı 2 katına çıkar, geçiş 1 olur.
-        # Ön&Arka ise tabaka sayısı aynı kalır, geçiş 2 olur.
+        # Revolta durumunda tabaka sayısı DEĞİŞMEZ (aynı kalır), sadece geçiş 1 olur.
+        # Ön&Arka durumunda tabaka sayısı aynı kalır, geçiş 2 olur.
         # Tek Yüz veya Baskı Yok ise tabaka sayısı aynı kalır, geçiş 1 olur.
         
         ham_tabaka = r['baskiya_giren_tabaka']
+        final_baski_tabaka = ham_tabaka
+        
         if baski_metodu_str == "Revolta":
-            final_baski_tabaka = ham_tabaka * 2
             gecis_sayisi = 1
         elif baski_metodu_str == "Ön&Arka":
-            final_baski_tabaka = ham_tabaka
             gecis_sayisi = 2
         else:
-            final_baski_tabaka = ham_tabaka
             gecis_sayisi = 1
 
         tabaka_fmt = f"{r['tabaka_adeti']:,}".replace(',', '.')
