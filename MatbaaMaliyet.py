@@ -6,7 +6,7 @@ import pandas as pd
 import json
 import os
 
-st.set_page_config(page_title="Matbaa ve Ambalaj Maliyet & Teklif Sistemi", layout="wide")
+st.set_page_config(page_title="Matbaa and Ambalaj Maliyet & Teklif Sistemi", layout="wide")
 
 # --- 0. KALICI JSON PARAMETRE YÖNETİMİ VE STATE SENKRONİZASYONU ---
 PARAM_FILE = "matbaa_parametreleri.json"
@@ -345,7 +345,7 @@ elif st.session_state.page == 'calc':
             
         return math.ceil(fire)
 
-    # --- PLANLAMA VE HESAPLAMA MOTORU (600 KG KURALI VE DÜZGÜN BOBİN KESİM HAVUZU) ---
+    # --- PLANLAMA VE HESAPLAMA MOTORU (NET EBAT VE 600 KG KURALI UYUMLU) ---
     def icsel_planla_ve_hesapla(net_adet, gramaj, kagit):
         params = st.session_state.params
         
@@ -358,8 +358,9 @@ elif st.session_state.page == 'calc':
 
         is_karton = kagit in ["Amerikan Bristol", "Krome Karton"]
         
-        # 1. Aşama: Standart Tabaka Ebatları Havuzu (Her koşulda geçerli)
+        # 1. Aşama: Standart Tabaka ve Tam Eşleşen Nokta Atışı Ebatlar Havuzu
         standart_adaylar = [
+            ("70x100 cm", "33,3x35 cm", 700.0, 1000.0, 333.0, 350.0, "3550", 10.0, 6),
             ("70x100 cm", "35x50 cm", 700.0, 1000.0, 350.0, 500.0, "3550", 10.0, 4),
             ("70x100 cm", "50x70 cm", 700.0, 1000.0, 500.0, 700.0, "5070", 12.0, 2),
             ("70x100 cm", "70x100 cm", 700.0, 1000.0, 700.0, 1000.0, "70100", 15.0, 1),
@@ -382,7 +383,6 @@ elif st.session_state.page == 'calc':
                     ("57x82 cm", "57x82 cm", 570.0, 820.0, 570.0, 820.0, "70100", 15.0, 1),
                 ])
 
-        # Önce standart tabakalar üzerinden en iyi montaj ve maliyeti bulalım
         en_iyi_secim = None
         min_maliyet = float('inf')
 
@@ -467,22 +467,18 @@ elif st.session_state.page == 'calc':
                         "makine_kodu": makine_kodu
                     }
 
-        # Önce standart adayları değerlendir
         adaylari_degerlendir(standart_adaylar)
 
-        # 2. Aşama: 600 KG KURALI
-        # Eğer ilk hesaplanan kg 600 kg ve üzerindeyse, düzgün bobin kesim havuzunu (60x60, 60x90, 70x70 vb. simetrik/verimli ebatlar) devreye sok
+        # 2. Aşama: 600 KG KURALI VE BOBİN KESİM / 60X100 1/8 ORANI
         geici_kg = en_iyi_secim['kg_kagit'] if en_iyi_secim else 0.0
         
         if is_karton and geici_kg >= 600.0:
-            bobin_kesim_adaylar = [
-                ("Bobin Kesim 60x60 cm", "60x60 cm", 600.0, 600.0, 600.0, 600.0, "5070", 12.0, 2),
+            yuksek_tonaj_adaylar = [
+                ("70x100 cm", "70x100 cm", 700.0, 1000.0, 700.0, 1000.0, "70100", 15.0, 1),
+                ("Bobin Kesim 60x100 cm", "60x100 cm", 600.0, 1000.0, 600.0, 1000.0, "70100", 15.0, 1),
                 ("Bobin Kesim 60x90 cm", "60x90 cm", 600.0, 900.0, 600.0, 900.0, "70100", 15.0, 1),
-                ("Bobin Kesim 70x70 cm", "70x70 cm", 700.0, 700.0, 700.0, 700.0, "70100", 15.0, 1),
-                ("Bobin Kesim 55x55 cm", "55x55 cm", 550.0, 550.0, 550.0, 550.0, "3550", 10.0, 4),
-                ("Bobin Kesim 65x65 cm", "65x65 cm", 650.0, 650.0, 650.0, 650.0, "70100", 15.0, 1),
             ]
-            adaylari_degerlendir(bobin_kesim_adaylar)
+            adaylari_degerlendir(yuksek_tonaj_adaylar)
 
         if en_iyi_secim is None:
             en_iyi_secim = {
@@ -537,7 +533,7 @@ elif st.session_state.page == 'calc':
         "alternatifler": teklif_alternatifleri
     }
 
-    st.markdown("### 📊 ÜRETİM VE PLANLAMA ÖZETİ (KUTU AÇINIM VE 600 KG KURALLI OPTİMİZASYON)")
+    st.markdown("### 📊 ÜRETİM VE PLANLAMA ÖZETİ (KUTU AÇINIM VE NET EBAT OPTİMİZASYONU)")
 
     def plan_kartini_yazdir(p):
         r = p['res']
