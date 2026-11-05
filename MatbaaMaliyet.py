@@ -274,9 +274,9 @@ elif st.session_state.page == 'calc':
 
     col_ebat1, col_ebat2, col_ebat3, col_baski1, col_baski2 = st.columns(5)
     with col_ebat1:
-        ebat_en = st.number_input("En (mm) [A]", value=480, key="ebat_en")
+        ebat_en = st.number_input("En (mm) [A]", value=300, key="ebat_en")
     with col_ebat2:
-        ebat_boy = st.number_input("Boy (mm) [B]", value=680, key="ebat_boy")
+        ebat_boy = st.number_input("Boy (mm) [B]", value=426, key="ebat_boy")
     with col_ebat3:
         if is_kutu:
             ebat_yukseklik = st.number_input("Yükseklik (mm) [C]", value=30, key="ebat_yukseklik")
@@ -315,7 +315,7 @@ elif st.session_state.page == 'calc':
     ozel_istekler = st.text_input("Özel İstekler", "", placeholder="Özel talepleri buraya yazınız...", key="ozel_istekler")
     st.markdown("---")
 
-    # --- 2 BOYUTLU PLANLAMA VE HESAPLAMA MOTORU (POSTER / FÖY / BROŞÜR VB.) ---
+    # --- 2 BOYUTLU PLANLAMA VE HESAPLAMA MOTORU (DOĞRU KAĞIT SEÇİM MATRİSİ) ---
     def icsel_2d_planla_ve_hesapla(net_adet, gramaj, kagit):
         params = st.session_state.params
         
@@ -323,19 +323,20 @@ elif st.session_state.page == 'calc':
         net_h_mm = ebat_boy + 3.0
 
         adaylar = [
-            ("70x100 cm (Tam Tabaka)", 700.0, 1000.0, "70100", 15.0),
-            ("50x70 cm (2'ye Bölünmüş)", 500.0, 700.0, "5070", 12.0),
-            ("35x50 cm (4'e Bölünmüş)", 350.0, 500.0, "3550", 10.0),
-            ("64x90 cm (Tam Tabaka)", 640.0, 900.0, "70100", 15.0),
-            ("45x64 cm (2'ye Bölünmüş)", 450.0, 640.0, "5070", 12.0),
-            ("57x82 cm (Tam Tabaka)", 570.0, 820.0, "70100", 15.0),
-            ("41x57 cm (2'ye Bölünmüş)", 410.0, 570.0, "5070", 12.0),
+            ("64x90 cm", "32x45 cm", 320.0, 450.0, 640.0, 900.0, "3550", 10.0, 4),
+            ("64x90 cm", "45x64 cm", 450.0, 640.0, 640.0, 900.0, "5070", 12.0, 2),
+            ("64x90 cm", "64x90 cm", 640.0, 900.0, 640.0, 900.0, "70100", 15.0, 1),
+            ("70x100 cm", "35x50 cm", 350.0, 500.0, 700.0, 1000.0, "3550", 10.0, 4),
+            ("70x100 cm", "50x70 cm", 500.0, 700.0, 700.0, 1000.0, "5070", 12.0, 2),
+            ("70x100 cm", "70x100 cm", 700.0, 1000.0, 700.0, 1000.0, "70100", 15.0, 1),
+            ("57x82 cm", "41x57 cm", 410.0, 570.0, 570.0, 820.0, "5070", 12.0, 2),
+            ("57x82 cm", "57x82 cm", 570.0, 820.0, 570.0, 820.0, "70100", 15.0, 1),
         ]
 
         en_iyi_secim = None
         min_maliyet = float('inf')
 
-        for kagit_adi, tw, th, makine_kodu, makas in adaylar:
+        for ana_tabaka, baski_ebat_adi, tw, th, ana_w, ana_h, makine_kodu, makas, bolunme_orani in adaylar:
             avail_w = tw - makas
             avail_h = th
             
@@ -357,28 +358,16 @@ elif st.session_state.page == 'calc':
 
             brut_adet = int(math.ceil(net_adet * (1 + (fire_pct / 100.0))))
             
-            tabaka_adeti = math.ceil(brut_adet / montaj)
-            if tabaka_adeti < 100: tabaka_adeti = 100
+            baskiya_giren_tabaka = math.ceil(brut_adet / montaj)
+            if baskiya_giren_tabaka < 100: baskiya_giren_tabaka = 100
 
-            bolunme_orani = 1
-            if "2'ye Bölünmüş" in kagit_adi:
-                bolunme_orani = 2
-            elif "4'e Bölünmüş" in kagit_adi:
-                bolunme_orani = 4
+            tabaka_adeti = math.ceil(baskiya_giren_tabaka / bolunme_orani)
+            if tabaka_adeti < 50: tabaka_adeti = 50
 
             baskiya_giren_tabaka_adeti = tabaka_adeti * bolunme_orani
 
-            if "70x100" in kagit_adi or "50x70" in kagit_adi or "35x50" in kagit_adi:
-                ana_ebat = "70x100 cm"
-            elif "64x90" in kagit_adi or "45x64" in kagit_adi:
-                ana_ebat = "64x90 cm"
-            elif "57x82" in kagit_adi or "41x57" in kagit_adi:
-                ana_ebat = "57x82 cm"
-            else:
-                ana_ebat = "70x100 cm"
-
-            tab_en = tw / 1000.0
-            tab_boy = th / 1000.0
+            tab_en = ana_w / 1000.0
+            tab_boy = ana_h / 1000.0
             toplam_m2 = round(tabaka_adeti * tab_en * tab_boy, 2)
             kg_kagit = round((toplam_m2 * gramaj) / 1000.0, 2)
 
@@ -405,8 +394,8 @@ elif st.session_state.page == 'calc':
                     "montaj_adedi": montaj,
                     "tabaka_adeti": tabaka_adeti,
                     "baskiya_giren_tabaka": baskiya_giren_tabaka_adeti,
-                    "ana_ebat": ana_ebat,
-                    "baski_ebat_str": kagit_adi.split(" (")[0],
+                    "ana_ebat": ana_tabaka,
+                    "baski_ebat_str": baski_ebat_adi,
                     "toplam_m2": toplam_m2,
                     "kg_kagit": kg_kagit,
                     "kagit_maliyeti": kagit_maliyeti,
@@ -418,9 +407,9 @@ elif st.session_state.page == 'calc':
         if en_iyi_secim is None:
             en_iyi_secim = {
                 "brut_adet": net_adet, "fire_pct": 5.0, "montaj_adedi": 1, "tabaka_adeti": net_adet,
-                "baskiya_giren_tabaka": net_adet, "ana_ebat": "70x100 cm", "baski_ebat_str": "50x70 cm",
+                "baskiya_giren_tabaka": net_adet, "ana_ebat": "70x100 cm", "baski_ebat_str": "35x50 cm",
                 "toplam_m2": 100.0, "kg_kagit": 50.0, "kagit_maliyeti": 1000.0, "baski_maliyeti": 1000.0,
-                "toplam_uretim_maliyeti": 2500.0, "makine_kodu": "5070"
+                "toplam_uretim_maliyeti": 2500.0, "makine_kodu": "3550"
             }
 
         return en_iyi_secim
@@ -468,7 +457,7 @@ elif st.session_state.page == 'calc':
         "alternatifler": teklif_alternatifleri
     }
 
-    st.markdown("### 📊 ÜRETİM VE PLANLAMA ÖZETİ (2 BOYUTLU POSTER / FÖY KURGUSU)")
+    st.markdown("### 📊 ÜRETİM VE PLANLAMA ÖZETİ (2 BOYUTLU PLANLAMA KURGUSU)")
 
     def plan_kartini_yazdir(p):
         r = p['res']
@@ -485,9 +474,9 @@ elif st.session_state.page == 'calc':
             {"Parametre / Kriter": "Fire Oranı (%)", "Değer": f"%{r['fire_pct']:.1f}"},
             {"Parametre / Kriter": "Brüt Adet", "Değer": f"{r['brut_adet']:,} adet"},
             {"Parametre / Kriter": "Montaj Planı", "Değer": f"1 Tabakada {r['montaj_adedi']} Ürün ({urun_tipi})"},
-            {"Parametre / Kriter": "Ana Tabaka Ebadı ve Sayısı", "Değer": f"{r['ana_ebat']} {f'{r["tabaka_adeti"]:,}'.replace(',', '.')} Tabaka"},
+            {"Parametre / Kriter": "Ana Tabaka Ebadı ve Sayısı", "Değer": f"{r['ana_ebat']} {f'{r[\"tabaka_adeti\"]:,}'.replace(',', '.')} Tabaka"},
             {"Parametre / Kriter": "Baskı Ebadı ve Sayısı", "Değer": f"4 Kalıp {r['baski_ebat_str']}"},
-            {"Parametre / Kriter": "Baskıya Girecek Kağıt Ebadı ve Sayısı", "Değer": f"{r['baski_ebat_str']} {f'{r["baskiya_giren_tabaka"]:,}'.replace(',', '.')} Tabaka"},
+            {"Parametre / Kriter": "Baskıya Girecek Kağıt Ebadı ve Sayısı", "Değer": f"{r['baski_ebat_str']} {f'{r[\"baskiya_giren_tabaka\"]:,}'.replace(',', '.')} Tabaka"},
             {"Parametre / Kriter": "Kağıt Kilogram (kg)", "Değer": f"{r['kg_kagit']} kg"},
             {"Parametre / Kriter": "Baskı Adedi ve Geçiş Sayısı", "Değer": baski_adedi_gecis_str},
             {"Parametre / Kriter": "Baskı Metodu", "Değer": baski_metodu_str},
