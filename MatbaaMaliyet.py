@@ -351,15 +351,12 @@ elif st.session_state.page == 'calc':
         
         # 1. Açınım Ölçüsü Hesaplama (Standart Kutu Formülleri)
         if is_kutu:
-            # En Açınım = ((En * 2) + (Yükseklik * 2)) + 15 mm
             acinin_en = ((ebat_en * 2) + (ebat_yukseklik * 2)) + 15.0
-            # Boy Açınım = (Boy + (Yükseklik * 2)) + 30 mm
             acinin_boy = (ebat_boy + (ebat_yukseklik * 2)) + 30.0
         else:
             acinin_en = ebat_en + 3.0
             acinin_boy = ebat_boy + 3.0
 
-        # Tabaka Alternatifleri Havuzu (Ana Tabaka, Baskı Ebat, En_mm, Boy_mm, Makine Kodu, Makas, Bolunme Oranı)
         tum_adaylar = [
             ("64x90 cm", "32x45 cm", 640.0, 900.0, 320.0, 450.0, "3550", 10.0, 4),
             ("64x90 cm", "45x64 cm", 640.0, 900.0, 450.0, 640.0, "5070", 12.0, 2),
@@ -381,24 +378,18 @@ elif st.session_state.page == 'calc':
             avail_h = th
             
             if is_kutu:
-                # Kutu Montaj Yerleşim Formülleri (3 Alternatifli Stratejik Değerlendirme)
-                # En ebadı sıra sayısı ile, Boy ebadı özel formülle [(Boy+Yükseklik+15)*sıra] + [(Yükseklik+15)*2]
+                montaj = 1
                 for sira_w in [1, 2, 3, 4]:
                     for sira_h in [1, 2, 3, 4]:
-                        montaj = sira_w * sira_h
-                        if montij <= 0: continue
+                        m_deneme = sira_w * sira_h
+                        if m_deneme <= 0: continue
                         
                         yerlesim_en = acinin_en * sira_w
                         yerlesim_boy = ((ebat_boy + ebat_yukseklik + 15.0) * sira_h) + ((ebat_yukseklik + 15.0) * 2)
                         
-                        # Sığma kontrolü
                         if (yerlesim_en <= avail_w and yerlesim_boy <= avail_h) or (yerlesim_en <= avail_h and yerlesim_boy <= avail_w):
-                            pass
-                        else:
-                            # Standart basit yerleşim alternatifi
-                            s1_x = int(avail_w // acinin_en)
-                            s1_y = int(avail_h // acinin_boy)
-                            montaj = s1_x * s1_y
+                            if m_deneme > montaj:
+                                montaj = m_deneme
             else:
                 s1_x = int(avail_w // acinin_en)
                 s1_y = int(avail_h // acinin_boy)
