@@ -467,30 +467,29 @@ elif st.session_state.page == 'calc':
         
         st.markdown(f"**Kağıt & Adet:** {net_kullanici_adeti:,} adet - {p['gramaj']}g {secilen_kagit}")
         
-        # --- 4 ALTERNATİFLİ BASKI METODU BELİRLEME MANTIĞI ---
+        # --- BASKI METODU BELİRLEME MANTIĞI (KAĞIT CİNSİ KISITI EKLENDİ) ---
         cmyk_on_arka = (cmyk_secim == "Ön&Arka")
         pantone_on_arka = "(Ön&Arka)" in pantone_secimi
         cmyk_yok = (cmyk_secim == "CMYK Baskı yok")
         pantone_yok = (pantone_secimi == "Yok")
 
+        # Revolta için kağıt cinsi şartı: Sadece "Kuşe Kağıt" veya "1. Hamur Kağıt" olabilir!
+        kagit_revolta_uygun = secilen_kagit in ["Kuşe Kağıt", "1. Hamur Kağıt"]
+
         # 1. Seçenek: Baskı Yok
         if cmyk_yok and pantone_yok:
             baski_metodu_str = "Baskı Yok"
-        # 4. Seçenek: Revolta (Ön&Arka veya Pantone Ön&Arka ve montaj adedi çift rakam ise)
-        elif (cmyk_on_arka or pantone_on_arka) and (montaj_adedi % 2 == 0):
+        # 4. Seçenek: Revolta (Ön&Arka seçili, montaj çift adet ve kağıt kuşe/1.hamur ise)
+        elif (cmyk_on_arka or pantone_on_arka) and (montaj_adedi % 2 == 0) and kagit_revolta_uygun:
             baski_metodu_str = "Revolta"
-        # 3. Seçenek: Ön&Arka (Ön&Arka seçili ama revolta değilse)
+        # 3. Seçenek: Ön&Arka (Diğer ön&arka durumları veya karton/bristol olduğu için revolta yasaksa)
         elif cmyk_on_arka or pantone_on_arka:
             baski_metodu_str = "Ön&Arka"
-        # 2. Seçenek: Tek Yüz (Diğer standart durumlar)
+        # 2. Seçenek: Tek Yüz
         else:
             baski_metodu_str = "Tek Yüz"
 
         # --- TABAKA SAYISI VE BASKI ADEDİ / GEÇİŞ SAYISI KURGUSU ---
-        # Revolta durumunda fiziksel kağıt tabaka sayısı AYNI kalır, 
-        # ancak baskı yüzeyi / vuruş adedi iki katına çıkarak gösterilir (örn: 1.752 tabaka x 2 baskı / geçiş veya mantıksal vuruş)
-        # Ön&Arka durumunda kağıt tabaka sayısı aynı kalır, 2 geçiş yazılır.
-        
         ham_tabaka = r['baskiya_giren_tabaka']
         final_baski_tabaka = ham_tabaka
         
@@ -656,7 +655,7 @@ elif st.session_state.page == 'teklif':
                 "Ana Tabaka": res['ana_ebat'],
                 "Kağıt Ağırlığı": f"{res['kg_kagit']} kg",
                 "Birim Satış Fiyatı (TL)": f"₺{birim_satis_tl:,.4f}",
-                "Karlı Toplam Tutar (TL)": f"₺{toplam_sait_tl:,.2f}" if 'toplam_sait_tl' in locals() else f"₺{toplam_satis_tl:,.2f}"
+                "Karlı Toplam Tutar (TL)": f"₺{toplam_satis_tl:,.2f}"
             })
 
         df_teklif = pd.DataFrame(table_rows)
