@@ -345,11 +345,10 @@ elif st.session_state.page == 'calc':
             
         return math.ceil(fire)
 
-    # --- PLANLAMA VE HESAPLAMA MOTORU (EBAT HAVUZLARI VE 3 ALTERNATİF OPTİMİZASYON) ---
+    # --- PLANLAMA VE HESAPLAMA MOTORU (AKILLI BÖLME VE EKONOMİK EBAT OPTİMİZASYONU) ---
     def icsel_planla_ve_hesapla(net_adet, gramaj, kagit):
         params = st.session_state.params
         
-        # 1. Açınım Ölçüsü Hesaplama (Standart Kutu Formülleri)
         if is_kutu:
             acinin_en = ((ebat_en * 2) + (ebat_yukseklik * 2)) + 15.0
             acinin_boy = (ebat_boy + (ebat_yukseklik * 2)) + 30.0
@@ -357,38 +356,32 @@ elif st.session_state.page == 'calc':
             acinin_en = ebat_en + 3.0
             acinin_boy = ebat_boy + 3.0
 
-        # Ebat Havuzu Tanımlama (Kartonlar vs Kuşe/Hamur ayrımı)
         is_karton = kagit in ["Amerikan Bristol", "Krome Karton"]
-        
         tum_adaylar = []
         
         if is_karton:
-            # Karton Grubu Ebatları (70x100 ailesi + Bobin kesimler)
             karton_ebatlar = [
-                # Standartlar
                 ("70x100 cm", "35x50 cm", 700.0, 1000.0, 350.0, 500.0, "3550", 10.0, 4),
                 ("70x100 cm", "50x70 cm", 700.0, 1000.0, 500.0, 700.0, "5070", 12.0, 2),
                 ("70x100 cm", "70x100 cm", 700.0, 1000.0, 700.0, 1000.0, "70100", 15.0, 1),
                 ("70x100 cm", "33,3x70 cm", 700.0, 1000.0, 333.0, 700.0, "3550", 10.0, 3),
                 ("70x100 cm", "35x65 cm", 700.0, 1000.0, 350.0, 650.0, "3550", 10.0, 4),
+                ("70x100 cm", "35x33,3 cm", 700.0, 1000.0, 350.0, 333.0, "3550", 10.0, 6),
                 ("70x100 cm", "23x50 cm", 700.0, 1000.0, 230.0, 500.0, "3550", 10.0, 6),
                 ("70x100 cm", "25x45 cm", 700.0, 1000.0, 250.0, 450.0, "3550", 10.0, 6),
             ]
             
-            # Bobin Kesim Ebatları (55, 60, 65, 70 serileri)
             seriler = [550, 600, 650, 700]
             boylar = [600, 650, 700, 750, 800, 850, 900, 950, 1000]
             for s in seriler:
                 for b in boylar:
-                    if s == 700 and b > 950: continue # 70x95 üstü yok
-                    # Makine kodu ve bölunme belirleme
+                    if s == 700 and b > 950: continue
                     mk = "3550" if s <= 500 and b <= 700 else ("5070" if max(s, b) <= 700 else "70100")
                     bol = 1 if max(s, b) > 700 else 2
                     karton_ebatlar.append((f"Bobin Kesim {s//10}x{b//10} cm", f"{s//10}x{b//10} cm", float(s), float(b), float(s), float(b), mk, 12.0, bol))
             
             tum_adaylar = karton_ebatlar
         else:
-            # Kuşe ve 1. Hamur Ebatları (64x90, 70x100 ve 170gr altı için 57x82)
             kuse_hamur_ebatlar = [
                 ("64x90 cm", "32x45 cm", 640.0, 900.0, 320.0, 450.0, "3550", 10.0, 4),
                 ("64x90 cm", "45x64 cm", 640.0, 900.0, 450.0, 640.0, "5070", 12.0, 2),
@@ -451,6 +444,11 @@ elif st.session_state.page == 'calc':
             toplam_m2 = round(tabaka_adeti * tab_en * tab_boy, 2)
             kg_kagit = round((toplam_m2 * gramaj) / 1000.0, 2)
 
+            # Kağıt alanı / boşa giden alanı minimize eden verimlilik cezası (Akıllı Bölme Optimizasyonu)
+            kagit_alan_m2 = (ana_w / 100.0) * (ana_h / 100.0)
+            urun_kapladigi_alan = montaj * ((acinin_en / 100.0) * (acinin_boy / 100.0))
+            bosluk_orani = max(0.0, 1.0 - (urun_kapladigi_alan / max(0.001, kagit_alan_m2 * bolunme_orani)))
+
             if kagit == "Amerikan Bristol": ton_fiyat = params['bristol'] * canli_usd
             elif kagit == "Krome Karton": ton_fiyat = params['krome']
             elif kagit == "Kuşe Kağıt": ton_fiyat = params['kuse'] * canli_eur
@@ -462,7 +460,9 @@ elif st.session_state.page == 'calc':
             b_tiraj = params.get(f"b_{makine_kodu}_tiraj", 800.0)
             fazla_vurus = max(0, baskiya_giren_tabaka_adeti - 2000)
             baski_maliyeti = b_cmyk + (fazla_vurus / 1000.0) * b_tiraj
-            toplam_maliyet = kagit_maliyeti + baski_maliyeti + 400.0
+            
+            # Verimlilik cezası ile bobin kesimlerde en dar ve ekonomik ebadın seçilmesi sağlanır
+            toplam_maliyet = kagit_maliyeti + baski_maliyeti + 400.0 + (bosluk_orani * 500.0)
 
             brut_adet = baskiya_giren_tabaka_adeti * montaj
             fire_pct_ortalama = round((fire_tabaka / max(1, net_baski_tabaka)) * 100.0, 1)
