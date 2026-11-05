@@ -276,8 +276,7 @@ elif st.session_state.page == 'calc':
         if kalan > 0: fire += kalan * 0.02
         return math.ceil(fire)
 
-    # --- FİZİKSEL MAKİNE KISITI ---
-    # Uzun veya geniş tabakaların ucuza basılmasını engeller, algoritmayı dar (verimli) ebatlara zorlar.
+    # --- FİZİKSEL MAKİNE VE MAKAS KISITLARI ---
     def get_machine_code(w, h):
         max_dim = max(w, h)
         min_dim = min(w, h)
@@ -285,7 +284,12 @@ elif st.session_state.page == 'calc':
         elif max_dim <= 700 and min_dim <= 500: return "5070"
         else: return "70100"
 
-    # --- DİNAMİK BOBİN ÜRETİCİSİ (Alt Bölmeli) ---
+    def get_makas(machine_code):
+        if machine_code == "70100": return 15.0
+        elif machine_code == "5070": return 12.0
+        else: return 10.0
+
+    # --- DİNAMİK BOBİN ÜRETİCİSİ ---
     def bobin_adaylarini_uret():
         cands = []
         enler = [550, 600, 650, 700]
@@ -296,20 +300,24 @@ elif st.session_state.page == 'calc':
                 ana_w, ana_h = float(e), float(b)
                 ana_isim = f"Bobin Kesim {int(e//10)}x{int(b//10)} cm"
                 
-                # 1. 1/1 Tam Ebat
-                cands.append((ana_isim, f"{int(e//10)}x{int(b//10)} cm", ana_w, ana_h, ana_w, ana_h, get_machine_code(ana_w, ana_h), 12.0, 1))
-                # 2. 1/2 Bölme (En'den)
+                m_code_1 = get_machine_code(ana_w, ana_h)
+                cands.append((ana_isim, f"{int(e//10)}x{int(b//10)} cm", ana_w, ana_h, ana_w, ana_h, m_code_1, get_makas(m_code_1), 1))
+                
                 w2 = ana_w / 2
-                cands.append((ana_isim, f"{w2/10:.1f}x{ana_h/10:.1f} cm".replace(".0",""), ana_w, ana_h, w2, ana_h, get_machine_code(w2, ana_h), 10.0, 2))
-                # 3. 1/2 Bölme (Boy'dan)
+                m_code_2 = get_machine_code(w2, ana_h)
+                cands.append((ana_isim, f"{w2/10:.1f}x{ana_h/10:.1f} cm".replace(".0",""), ana_w, ana_h, w2, ana_h, m_code_2, get_makas(m_code_2), 2))
+                
                 h2 = ana_h / 2
-                cands.append((ana_isim, f"{ana_w/10:.1f}x{h2/10:.1f} cm".replace(".0",""), ana_w, ana_h, ana_w, h2, get_machine_code(ana_w, h2), 10.0, 2))
-                # 4. 1/4 Bölme (Çeyrek)
+                m_code_3 = get_machine_code(ana_w, h2)
+                cands.append((ana_isim, f"{ana_w/10:.1f}x{h2/10:.1f} cm".replace(".0",""), ana_w, ana_h, ana_w, h2, m_code_3, get_makas(m_code_3), 2))
+                
                 w4, h4 = ana_w / 2, ana_h / 2
-                cands.append((ana_isim, f"{w4/10:.1f}x{h4/10:.1f} cm".replace(".0",""), ana_w, ana_h, w4, h4, get_machine_code(w4, h4), 10.0, 4))
-                # 5. 1/3 Bölme (Boy'dan üçe)
+                m_code_4 = get_machine_code(w4, h4)
+                cands.append((ana_isim, f"{w4/10:.1f}x{h4/10:.1f} cm".replace(".0",""), ana_w, ana_h, w4, h4, m_code_4, get_makas(m_code_4), 4))
+                
                 h3 = ana_h / 3
-                cands.append((ana_isim, f"{ana_w/10:.1f}x{h3/10:.1f} cm".replace(".0",""), ana_w, ana_h, ana_w, h3, get_machine_code(ana_w, h3), 10.0, 3))
+                m_code_5 = get_machine_code(ana_w, h3)
+                cands.append((ana_isim, f"{ana_w/10:.1f}x{h3/10:.1f} cm".replace(".0",""), ana_w, ana_h, ana_w, h3, m_code_5, get_makas(m_code_5), 3))
         return cands
 
     # --- PLANLAMA MOTORU ---
@@ -325,29 +333,29 @@ elif st.session_state.page == 'calc':
 
         is_karton = kagit in ["Amerikan Bristol", "Krome Karton"]
         
-        # Kesin Makine Kodlu Standart Tabaka Havuzu
+        # Kesin Makine Kodlu ve Dinamik Makaslı Standart Tabaka Havuzu
         standart_adaylar = [
-            ("70x100 cm", "33,3x35 cm", 700.0, 1000.0, 333.0, 350.0, get_machine_code(333.0, 350.0), 10.0, 6),
-            ("70x100 cm", "35x50 cm", 700.0, 1000.0, 350.0, 500.0, get_machine_code(350.0, 500.0), 10.0, 4),
-            ("70x100 cm", "50x70 cm", 700.0, 1000.0, 500.0, 700.0, get_machine_code(500.0, 700.0), 12.0, 2),
-            ("70x100 cm", "70x100 cm", 700.0, 1000.0, 700.0, 1000.0, get_machine_code(700.0, 1000.0), 15.0, 1),
-            ("70x100 cm", "33,3x70 cm", 700.0, 1000.0, 333.0, 700.0, get_machine_code(333.0, 700.0), 10.0, 3),
-            ("70x100 cm", "35x65 cm", 700.0, 1000.0, 350.0, 650.0, get_machine_code(350.0, 650.0), 10.0, 4),
-            ("70x100 cm", "35x33,3 cm", 700.0, 1000.0, 350.0, 333.0, get_machine_code(350.0, 333.0), 10.0, 6),
-            ("70x100 cm", "23x50 cm", 700.0, 1000.0, 230.0, 500.0, get_machine_code(230.0, 500.0), 10.0, 6),
-            ("70x100 cm", "25x45 cm", 700.0, 1000.0, 250.0, 450.0, get_machine_code(250.0, 450.0), 10.0, 6),
+            ("70x100 cm", "33,3x35 cm", 700.0, 1000.0, 333.0, 350.0, get_machine_code(333.0, 350.0), get_makas(get_machine_code(333.0, 350.0)), 6),
+            ("70x100 cm", "35x50 cm", 700.0, 1000.0, 350.0, 500.0, get_machine_code(350.0, 500.0), get_makas(get_machine_code(350.0, 500.0)), 4),
+            ("70x100 cm", "50x70 cm", 700.0, 1000.0, 500.0, 700.0, get_machine_code(500.0, 700.0), get_makas(get_machine_code(500.0, 700.0)), 2),
+            ("70x100 cm", "70x100 cm", 700.0, 1000.0, 700.0, 1000.0, get_machine_code(700.0, 1000.0), get_makas(get_machine_code(700.0, 1000.0)), 1),
+            ("70x100 cm", "33,3x70 cm", 700.0, 1000.0, 333.0, 700.0, get_machine_code(333.0, 700.0), get_makas(get_machine_code(333.0, 700.0)), 3),
+            ("70x100 cm", "35x65 cm", 700.0, 1000.0, 350.0, 650.0, get_machine_code(350.0, 650.0), get_makas(get_machine_code(350.0, 650.0)), 4),
+            ("70x100 cm", "35x33,3 cm", 700.0, 1000.0, 350.0, 333.0, get_machine_code(350.0, 333.0), get_makas(get_machine_code(350.0, 333.0)), 6),
+            ("70x100 cm", "23x50 cm", 700.0, 1000.0, 230.0, 500.0, get_machine_code(230.0, 500.0), get_makas(get_machine_code(230.0, 500.0)), 6),
+            ("70x100 cm", "25x45 cm", 700.0, 1000.0, 250.0, 450.0, get_machine_code(250.0, 450.0), get_makas(get_machine_code(250.0, 450.0)), 6),
         ]
 
         if not is_karton:
             standart_adaylar.extend([
-                ("64x90 cm", "32x45 cm", 640.0, 900.0, 320.0, 450.0, get_machine_code(320.0, 450.0), 10.0, 4),
-                ("64x90 cm", "45x64 cm", 640.0, 900.0, 450.0, 640.0, get_machine_code(450.0, 640.0), 12.0, 2),
-                ("64x90 cm", "64x90 cm", 640.0, 900.0, 640.0, 900.0, get_machine_code(640.0, 900.0), 15.0, 1),
+                ("64x90 cm", "32x45 cm", 640.0, 900.0, 320.0, 450.0, get_machine_code(320.0, 450.0), get_makas(get_machine_code(320.0, 450.0)), 4),
+                ("64x90 cm", "45x64 cm", 640.0, 900.0, 450.0, 640.0, get_machine_code(450.0, 640.0), get_makas(get_machine_code(450.0, 640.0)), 2),
+                ("64x90 cm", "64x90 cm", 640.0, 900.0, 640.0, 900.0, get_machine_code(640.0, 900.0), get_makas(get_machine_code(640.0, 900.0)), 1),
             ])
             if gramaj <= 170:
                 standart_adaylar.extend([
-                    ("57x82 cm", "41x57 cm", 570.0, 820.0, 410.0, 570.0, get_machine_code(410.0, 570.0), 12.0, 2),
-                    ("57x82 cm", "57x82 cm", 570.0, 820.0, 570.0, 820.0, get_machine_code(570.0, 820.0), 15.0, 1),
+                    ("57x82 cm", "41x57 cm", 570.0, 820.0, 410.0, 570.0, get_machine_code(410.0, 570.0), get_makas(get_machine_code(410.0, 570.0)), 2),
+                    ("57x82 cm", "57x82 cm", 570.0, 820.0, 570.0, 820.0, get_machine_code(570.0, 820.0), get_makas(get_machine_code(570.0, 820.0)), 1),
                 ])
 
         en_iyi_secim = None
@@ -366,8 +374,9 @@ elif st.session_state.page == 'calc':
                             m_deneme = sira_w * sira_h
                             if m_deneme <= 0: continue
                             
+                            # KÖKLÜ HATA BURADA ÇÖZÜLDÜ: İç içe geçme formülü iptal edildi. Net açınım üzerinden matematiksel montaj.
                             yerlesim_en = acinin_en * sira_w
-                            yerlesim_boy = ((ebat_boy + ebat_yukseklik + 15.0) * sira_h) + ((ebat_yukseklik + 15.0) * 2)
+                            yerlesim_boy = acinin_boy * sira_h
                             
                             if (yerlesim_en <= avail_w and yerlesim_boy <= avail_h) or (yerlesim_en <= avail_h and yerlesim_boy <= avail_w):
                                 if m_deneme > montaj:
@@ -438,7 +447,6 @@ elif st.session_state.page == 'calc':
         adaylari_degerlendir(standart_adaylar)
 
         # 2. 600 KG Bobin Kuralı ve Dinamik Kesim Değerlendirmesi
-        # Sadece standart tabakadaki kağıt tüketimi 600 kg üzeriyse devreye girer
         geici_kg = en_iyi_secim['kg_kagit'] if en_iyi_secim else 0.0
         
         if is_karton and geici_kg >= 600.0:
@@ -486,7 +494,7 @@ elif st.session_state.page == 'calc':
         "kar_orani": kar_orani, "alternatifler": teklif_alternatifleri
     }
 
-    st.markdown("### 📊 ÜRETİM VE PLANLAMA ÖZETİ (PRO MOD: MAKİNE KISITLI MÜHENDİSLİK HESABI)")
+    st.markdown("### 📊 ÜRETİM VE PLANLAMA ÖZETİ (PRO MOD: KÖK HATA ÇÖZÜLDÜ)")
 
     def plan_kartini_yazdir(p):
         r = p['res']
