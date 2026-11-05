@@ -283,18 +283,20 @@ elif st.session_state.page == 'calc':
         else:
             ebat_yukseklik = st.number_input("Yükseklik (mm) [C] (Kilitli)", value=0.0, disabled=True, key="ebat_yukseklik_locked")
     with col_baski1:
-        cmyk_secim = st.selectbox("Baskı CMYK", ["Çift Yüz", "Tek Yüz", "CMYK Baskı yok"], key="cmyk_secim")
+        # Güncellendi: "Tek Yüz", "Ön&Arka", "Revolta"
+        cmyk_secim = st.selectbox("Baskı CMYK", ["Tek Yüz", "Ön&Arka", "Revolta", "CMYK Baskı yok"], key="cmyk_secim")
     with col_baski2:
+        # Güncellendi: (Ön&Arka) etiketleri
         pantone_secenekleri = [
             "Yok", 
             "1 renk zemin", 
             "2 renk zemin", 
             "1 renk lokal", 
             "2 renk lokal", 
-            "1 renk zemin (Çift Yüz)", 
-            "2 renk zemin (Çift Yüz)", 
-            "1 renk lokal (Çift Yüz)", 
-            "2 renk lokal (Çift Yüz)"
+            "1 renk zemin (Ön&Arka)", 
+            "2 renk zemin (Ön&Arka)", 
+            "1 renk lokal (Ön&Arka)", 
+            "2 renk lokal (Ön&Arka)"
         ]
         pantone_secimi = st.selectbox("Baskı Pantone renk sayısı", pantone_secenekleri, key="pantone_secimi")
 
@@ -315,7 +317,7 @@ elif st.session_state.page == 'calc':
     ozel_istekler = st.text_input("Özel İstekler", "", placeholder="Özel talepleri buraya yazınız...", key="ozel_istekler")
     st.markdown("---")
 
-    # --- 2 BOYUTLU PLANLAMA VE HESAPLAMA MOTORU (DOĞRU KAĞIT SEÇİM MATRİSİ) ---
+    # --- 2 BOYUTLU PLANLAMA VE HESAPLAMA MOTORU ---
     def icsel_2d_planla_ve_hesapla(net_adet, gramaj, kagit):
         params = st.session_state.params
         
@@ -462,23 +464,65 @@ elif st.session_state.page == 'calc':
     def plan_kartini_yazdir(p):
         r = p['res']
         net_kullanici_adeti = p['adet']
+        secilen_kagit = p['kagit']
+        montaj_adedi = r['montaj_adedi']
         
-        st.markdown(f"**Kağıt & Adet:** {net_kullanici_adeti:,} adet - {p['gramaj']}g {p['kagit']}")
+        st.markdown(f"**Kağıt & Adet:** {net_kullanici_adeti:,} adet - {p['gramaj']}g {secilen_kagit}")
         
-        baski_metodu_str = "Çift Yüz" if cmyk_secim == "Çift Yüz" else "Tek Yüz"
-        gecis_sayisi = 2 if cmyk_secim == "Çift Yüz" else 1
-        
-        # Hata veren f-string çakışmaları tamamen temizlendi:
+        # --- REVOLTA OTOMATİK KARAR MEKANİZMASI ---
+        baski_metodu_str = cmyk_secim
+        if cmyk_secim == "Ön&Arka" and secilen_kagit in ["Kuşe Kağıt", "1. Hamur Kağıt"] and (montaj_adedi % 2 == 0):
+            baski_metodu_str = "Revolta"
+
+        gecis_sayisi = 1
+        if baski_metodu_str in ["Ön&Arka", "Revolta"]:
+            gecis_sayisi = 2
+
         tabaka_fmt = f"{r['tabaka_adeti']:,}".replace(',', '.')
         baski_tabaka_fmt = f"{r['baskiya_giren_tabaka']:,}".replace(',', '.')
         baski_adedi_gecis_str = f"{baski_tabaka_fmt} tabaka x {gecis_sayisi} geçiş"
+
+        # --- KALIP / RENK SAYISI MANTIK KAPSAMI ---
+        # Pantone renk sayısını string'den ayıklama (Örn: "1 renk lokal" -> 1)
+        p_adet = 0
+        if pantone_secimi != "Yok":
+            try:
+                p_adet = int(pantone_secimi.split()[0])
+            except Exception:
+                p_adet = 1
+
+        cmyk_aktif = cmyk_secim != "CMYK Baskı yok"
+        pantone_aktif = pantone_secimi != "Yok"
+
+        # Kalıp metni belirleme kurları:
+        if cmyk_aktif and not pantone_aktif:
+            if baski_metodu_str == "Tek Yüz":
+                kalip_metni = "4 Kalıp"
+            elif baski_metodu_str == "Revolta":
+                kalip_metni = "4 Kalıp"
+            else: # Ön&Arka ve Revolta değilse
+                kalip_metni = "8 Kalıp"
+        elif not cmyk_aktif and pantone_aktif:
+            if baski_metodu_str == "Tek Yüz" or baski_metodu_str == "Revolta":
+                kalip_metni = f"{p_adet} Kalıp"
+            else:
+                kalip_metni = f"{p_adet * 2} Kalıp"
+        elif cmyk_aktif and pantone_aktif:
+            if baski_metodu_str == "Tek Yüz" or baski_metodu_str == "Revolta":
+                kalip_metni = f"4+{p_adet} Kalıp"
+            else:
+                kalip_metni = f"8+{p_adet * 2} Kalıp"
+        else:
+            kalip_metni = "0 Kalıp"
+
+        baski_ebat_detay = f"{kalip_metni} {r['baski_ebat_str']}"
 
         plan_df = pd.DataFrame([
             {"Parametre / Kriter": "Fire Oranı (%)", "Değer": f"%{r['fire_pct']:.1f}"},
             {"Parametre / Kriter": "Brüt Adet", "Değer": f"{r['brut_adet']:,} adet"},
             {"Parametre / Kriter": "Montaj Planı", "Değer": f"1 Tabakada {r['montaj_adedi']} Ürün ({urun_tipi})"},
             {"Parametre / Kriter": "Ana Tabaka Ebadı ve Sayısı", "Değer": f"{r['ana_ebat']} {tabaka_fmt} Tabaka"},
-            {"Parametre / Kriter": "Baskı Ebadı ve Sayısı", "Değer": f"4 Kalıp {r['baski_ebat_str']}"},
+            {"Parametre / Kriter": "Baskı Ebadı ve Sayısı", "Değer": baski_ebat_detay},
             {"Parametre / Kriter": "Baskıya Girecek Kağıt Ebadı ve Sayısı", "Değer": f"{r['baski_ebat_str']} {baski_tabaka_fmt} Tabaka"},
             {"Parametre / Kriter": "Kağıt Kilogram (kg)", "Değer": f"{r['kg_kagit']} kg"},
             {"Parametre / Kriter": "Baskı Adedi ve Geçiş Sayısı", "Değer": baski_adedi_gecis_str},
