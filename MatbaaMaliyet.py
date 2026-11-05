@@ -283,10 +283,9 @@ elif st.session_state.page == 'calc':
         else:
             ebat_yukseklik = st.number_input("Yükseklik (mm) [C] (Kilitli)", value=0.0, disabled=True, key="ebat_yukseklik_locked")
     with col_baski1:
-        # Güncellendi: "Tek Yüz", "Ön&Arka", "Revolta"
-        cmyk_secim = st.selectbox("Baskı CMYK", ["Tek Yüz", "Ön&Arka", "Revolta", "CMYK Baskı yok"], key="cmyk_secim")
+        # Sadece "Tek Yüz", "Ön&Arka", "CMYK Baskı yok" (Revolta kullanıcı tarafından seçilmez, yazılım karar verir)
+        cmyk_secim = st.selectbox("Baskı CMYK", ["Tek Yüz", "Ön&Arka", "CMYK Baskı yok"], key="cmyk_secim")
     with col_baski2:
-        # Güncellendi: (Ön&Arka) etiketleri
         pantone_secenekleri = [
             "Yok", 
             "1 renk zemin", 
@@ -469,7 +468,7 @@ elif st.session_state.page == 'calc':
         
         st.markdown(f"**Kağıt & Adet:** {net_kullanici_adeti:,} adet - {p['gramaj']}g {secilen_kagit}")
         
-        # --- REVOLTA OTOMATİK KARAR MEKANİZMASI ---
+        # --- YAZILIM TARAFINDAN OTOMATİK BELİRLENEN BASKI METODU (REVOLTA / ÖN&ARKA / TEK YÜZ) ---
         baski_metodu_str = cmyk_secim
         if cmyk_secim == "Ön&Arka" and secilen_kagit in ["Kuşe Kağıt", "1. Hamur Kağıt"] and (montaj_adedi % 2 == 0):
             baski_metodu_str = "Revolta"
@@ -482,8 +481,7 @@ elif st.session_state.page == 'calc':
         baski_tabaka_fmt = f"{r['baskiya_giren_tabaka']:,}".replace(',', '.')
         baski_adedi_gecis_str = f"{baski_tabaka_fmt} tabaka x {gecis_sayisi} geçiş"
 
-        # --- KALIP / RENK SAYISI MANTIK KAPSAMI ---
-        # Pantone renk sayısını string'den ayıklama (Örn: "1 renk lokal" -> 1)
+        # --- KALIP / RENK SAYISI MANTIK KAPSAMI (2 NOKTADAN VERİ ALARAK: CMYK VE PANTONE) ---
         p_adet = 0
         if pantone_secimi != "Yok":
             try:
@@ -494,21 +492,19 @@ elif st.session_state.page == 'calc':
         cmyk_aktif = cmyk_secim != "CMYK Baskı yok"
         pantone_aktif = pantone_secimi != "Yok"
 
-        # Kalıp metni belirleme kurları:
+        # Kalıp hesaplama kural seti:
         if cmyk_aktif and not pantone_aktif:
-            if baski_metodu_str == "Tek Yüz":
+            if baski_metodu_str in ["Tek Yüz", "Revolta"]:
                 kalip_metni = "4 Kalıp"
-            elif baski_metodu_str == "Revolta":
-                kalip_metni = "4 Kalıp"
-            else: # Ön&Arka ve Revolta değilse
+            else: # Ön&Arka ve Revolta değilse (Ayrı kalıplar)
                 kalip_metni = "8 Kalıp"
         elif not cmyk_aktif and pantone_aktif:
-            if baski_metodu_str == "Tek Yüz" or baski_metodu_str == "Revolta":
+            if baski_metodu_str in ["Tek Yüz", "Revolta"]:
                 kalip_metni = f"{p_adet} Kalıp"
             else:
                 kalip_metni = f"{p_adet * 2} Kalıp"
         elif cmyk_aktif and pantone_aktif:
-            if baski_metodu_str == "Tek Yüz" or baski_metodu_str == "Revolta":
+            if baski_metodu_str in ["Tek Yüz", "Revolta"]:
                 kalip_metni = f"4+{p_adet} Kalıp"
             else:
                 kalip_metni = f"8+{p_adet * 2} Kalıp"
