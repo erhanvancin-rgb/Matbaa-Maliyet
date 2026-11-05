@@ -6,7 +6,7 @@ import pandas as pd
 import json
 import os
 
-st.set_page_config(page_title="Matbaa and Ambalaj Maliyet & Teklif Sistemi", layout="wide")
+st.set_page_config(page_title="Matbaa ve Ambalaj Maliyet & Teklif Sistemi", layout="wide")
 
 # --- 0. KALICI JSON PARAMETRE YÖNETİMİ VE STATE SENKRONİZASYONU ---
 PARAM_FILE = "matbaa_parametreleri.json"
@@ -345,7 +345,7 @@ elif st.session_state.page == 'calc':
             
         return math.ceil(fire)
 
-    # --- PLANLAMA VE HESAPLAMA MOTORU (NET EBAT VE 600 KG KURALI UYUMLU) ---
+    # --- PLANLAMA VE HESAPLAMA MOTORU (DİNAMİK İHTİYAÇ ODAKLI EBAT TAYİNİ) ---
     def icsel_planla_ve_hesapla(net_adet, gramaj, kagit):
         params = st.session_state.params
         
@@ -358,8 +358,10 @@ elif st.session_state.page == 'calc':
 
         is_karton = kagit in ["Amerikan Bristol", "Krome Karton"]
         
-        # 1. Aşama: Standart Tabaka ve Tam Eşleşen Nokta Atışı Ebatlar Havuzu
-        standart_adaylar = [
+        # Ürünün net açınım ölçüsüne ve ihtiyacına göre dinamik tabaka/baskı ebadı türetme
+        # Sabit bir ebat zorlaması yoktur; en dar/verimli ebat otomatik hesaplanır.
+        dinamik_adaylar = [
+            ("70x100 cm", f"{acinin_en/10:.1f}x{acinin_boy/10:.1f} cm", 700.0, 1000.0, acinin_en, acinin_boy, "3550", 10.0, 1),
             ("70x100 cm", "33,3x35 cm", 700.0, 1000.0, 333.0, 350.0, "3550", 10.0, 6),
             ("70x100 cm", "35x50 cm", 700.0, 1000.0, 350.0, 500.0, "3550", 10.0, 4),
             ("70x100 cm", "50x70 cm", 700.0, 1000.0, 500.0, 700.0, "5070", 12.0, 2),
@@ -367,18 +369,16 @@ elif st.session_state.page == 'calc':
             ("70x100 cm", "33,3x70 cm", 700.0, 1000.0, 333.0, 700.0, "3550", 10.0, 3),
             ("70x100 cm", "35x65 cm", 700.0, 1000.0, 350.0, 650.0, "3550", 10.0, 4),
             ("70x100 cm", "35x33,3 cm", 700.0, 1000.0, 350.0, 333.0, "3550", 10.0, 6),
-            ("70x100 cm", "23x50 cm", 700.0, 1000.0, 230.0, 500.0, "3550", 10.0, 6),
-            ("70x100 cm", "25x45 cm", 700.0, 1000.0, 250.0, 450.0, "3550", 10.0, 6),
         ]
 
         if not is_karton:
-            standart_adaylar.extend([
+            dinamik_adaylar.extend([
                 ("64x90 cm", "32x45 cm", 640.0, 900.0, 320.0, 450.0, "3550", 10.0, 4),
                 ("64x90 cm", "45x64 cm", 640.0, 900.0, 450.0, 640.0, "5070", 12.0, 2),
                 ("64x90 cm", "64x90 cm", 640.0, 900.0, 640.0, 900.0, "70100", 15.0, 1),
             ])
             if gramaj <= 170:
-                standart_adaylar.extend([
+                dinamik_adaylar.extend([
                     ("57x82 cm", "41x57 cm", 570.0, 820.0, 410.0, 570.0, "5070", 12.0, 2),
                     ("57x82 cm", "57x82 cm", 570.0, 820.0, 570.0, 820.0, "70100", 15.0, 1),
                 ])
@@ -467,16 +467,15 @@ elif st.session_state.page == 'calc':
                         "makine_kodu": makine_kodu
                     }
 
-        adaylari_degerlendir(standart_adaylar)
+        adaylari_degerlendir(dinamik_adaylar)
 
-        # 2. Aşama: 600 KG KURALI VE BOBİN KESİM / 60X100 1/8 ORANI
+        # 600 kg kuralı kontrolü ve dinamik bobin/tabaka optimizasyonu
         geici_kg = en_iyi_secim['kg_kagit'] if en_iyi_secim else 0.0
-        
         if is_karton and geici_kg >= 600.0:
+            # Yüksek tonajda ihtiyaca en uygun verimli ebat alternatifleri
             yuksek_tonaj_adaylar = [
                 ("70x100 cm", "70x100 cm", 700.0, 1000.0, 700.0, 1000.0, "70100", 15.0, 1),
-                ("Bobin Kesim 60x100 cm", "60x100 cm", 600.0, 1000.0, 600.0, 1000.0, "70100", 15.0, 1),
-                ("Bobin Kesim 60x90 cm", "60x90 cm", 600.0, 900.0, 600.0, 900.0, "70100", 15.0, 1),
+                ("70x100 cm", f"{min(700.0, acinin_en*2)}x{min(1000.0, acinin_boy*4)} cm", 700.0, 1000.0, 700.0, 1000.0, "70100", 15.0, 1),
             ]
             adaylari_degerlendir(yuksek_tonaj_adaylar)
 
@@ -533,7 +532,7 @@ elif st.session_state.page == 'calc':
         "alternatifler": teklif_alternatifleri
     }
 
-    st.markdown("### 📊 ÜRETİM VE PLANLAMA ÖZETİ (KUTU AÇINIM VE NET EBAT OPTİMİZASYONU)")
+    st.markdown("### 📊 ÜRETİM VE PLANLAMA ÖZETİ (DİNAMİK İHTİYAÇ ODAKLI PLANLAMA)")
 
     def plan_kartini_yazdir(p):
         r = p['res']
