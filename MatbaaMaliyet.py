@@ -8,7 +8,7 @@ import os
 
 st.set_page_config(page_title="Matbaa ve Ambalaj Maliyet & Teklif Sistemi", layout="wide")
 
-# --- 0. KALICI JSON PARAMETRE YÖNETİMİ ---
+# --- 0. KALICI JSON PARAMETRE YÖNETİMİ VE STATE SENKRONİZASYONU ---
 PARAM_FILE = "matbaa_parametreleri.json"
 
 default_params = {
@@ -136,7 +136,7 @@ if st.session_state.page == 'home':
             st.rerun()
 
 # ==========================================
-# MENÜ 2: PARAMETRELER SAYFASI (KALICI JSON VE STATE KORUMALI)
+# MENÜ 2: PARAMETRELER SAYFASI (STATE KORUMALI)
 # ==========================================
 elif st.session_state.page == 'params':
     st.subheader("Matbaa Maliyet Parametreleri Fiyat Listesi (Excel 37 Parametre Tam Listesi)")
@@ -146,72 +146,72 @@ elif st.session_state.page == 'params':
     
     with col1:
         st.markdown("#### 1. Kağıt ve Karton Grubu (Ton Maliyetleri)")
-        st.session_state.params['bristol'] = st.number_input("Amerikan Bristol Ton ($ USD)", value=st.session_state.params['bristol'], key="p_bris")
-        st.session_state.params['krome'] = st.number_input("Krome Karton Ton (TL)", value=st.session_state.params['krome'], key="p_krom")
-        st.session_state.params['kuse'] = st.number_input("Kuşe Ton (€ EUR)", value=st.session_state.params['kuse'], key="p_kus")
-        st.session_state.params['hamur'] = st.number_input("1. Hamur Ton ($ USD)", value=st.session_state.params['hamur'], key="p_ham")
+        st.session_state.params['bristol'] = st.number_input("Amerikan Bristol Ton ($ USD)", value=float(st.session_state.params['bristol']), key="p_bris")
+        st.session_state.params['krome'] = st.number_input("Krome Karton Ton (TL)", value=float(st.session_state.params['krome']), key="p_krom")
+        st.session_state.params['kuse'] = st.number_input("Kuşe Ton (€ EUR)", value=float(st.session_state.params['kuse']), key="p_kus")
+        st.session_state.params['hamur'] = st.number_input("1. Hamur Ton ($ USD)", value=float(st.session_state.params['hamur']), key="p_ham")
         
         st.markdown("---")
         st.markdown("#### 2. Baskı Grubu (9 Parametre)")
         st.markdown("##### 📐 35x50 Ebadı")
-        st.session_state.params['b_3550_cmyk'] = st.number_input("35x50 CMYK Hazırlık (₺)", value=st.session_state.params['b_3550_cmyk'], key="p_b35c")
-        st.session_state.params['b_3550_pantone'] = st.number_input("35x50 Pantone 1 Renk (₺)", value=st.session_state.params['b_3550_pantone'], key="p_b35p")
-        st.session_state.params['b_3550_tiraj'] = st.number_input("35x50 Tiraj (1.000 Adet/₺)", value=st.session_state.params['b_3550_tiraj'], key="p_b35t")
+        st.session_state.params['b_3550_cmyk'] = st.number_input("35x50 CMYK Hazırlık (₺)", value=float(st.session_state.params['b_3550_cmyk']), key="p_b35c")
+        st.session_state.params['b_3550_pantone'] = st.number_input("35x50 Pantone 1 Renk (₺)", value=float(st.session_state.params['b_3550_pantone']), key="p_b35p")
+        st.session_state.params['b_3550_tiraj'] = st.number_input("35x50 Tiraj (1.000 Adet/₺)", value=float(st.session_state.params['b_3550_tiraj']), key="p_b35t")
         
         st.markdown("##### 📐 50x70 Ebadı")
-        st.session_state.params['b_5070_cmyk'] = st.number_input("50x70 CMYK Hazırlık (₺)", value=st.session_state.params['b_5070_cmyk'], key="p_b50c")
-        st.session_state.params['b_5070_pantone'] = st.number_input("50x70 Pantone 1 Renk (₺)", value=st.session_state.params['b_5070_pantone'], key="p_b50p")
-        st.session_state.params['b_5070_tiraj'] = st.number_input("50x70 Tiraj (1.000 Adet/₺)", value=st.session_state.params['b_5070_tiraj'], key="p_b50t")
+        st.session_state.params['b_5070_cmyk'] = st.number_input("50x70 CMYK Hazırlık (₺)", value=float(st.session_state.params['b_5070_cmyk']), key="p_b50c")
+        st.session_state.params['b_5070_pantone'] = st.number_input("50x70 Pantone 1 Renk (₺)", value=float(st.session_state.params['b_5070_pantone']), key="p_b50p")
+        st.session_state.params['b_5070_tiraj'] = st.number_input("50x70 Tiraj (1.000 Adet/₺)", value=float(st.session_state.params['b_5070_tiraj']), key="p_b50t")
         
         st.markdown("##### 📐 70x100 Ebadı")
-        st.session_state.params['b_70100_cmyk'] = st.number_input("70x100 CMYK Hazırlık (₺)", value=st.session_state.params['b_70100_cmyk'], key="p_b70c")
-        st.session_state.params['b_70100_pantone'] = st.number_input("70x100 Pantone 1 Renk (₺)", value=st.session_state.params['b_70100_pantone'], key="p_b70p")
-        st.session_state.params['b_70100_tiraj'] = st.number_input("70x100 Tiraj (1.000 Adet/₺)", value=st.session_state.params['b_70100_tiraj'], key="p_b70t")
+        st.session_state.params['b_70100_cmyk'] = st.number_input("70x100 CMYK Hazırlık (₺)", value=float(st.session_state.params['b_70100_cmyk']), key="p_b70c")
+        st.session_state.params['b_70100_pantone'] = st.number_input("70x100 Pantone 1 Renk (₺)", value=float(st.session_state.params['b_70100_pantone']), key="p_b70p")
+        st.session_state.params['b_70100_tiraj'] = st.number_input("70x100 Tiraj (1.000 Adet/₺)", value=float(st.session_state.params['b_70100_tiraj']), key="p_b70t")
 
         st.markdown("---")
         st.markdown("##### 🧪 Dispresiyon Lak (Baskı Grubu Altı)")
-        st.session_state.params['disp_5070'] = st.number_input("50x70 Dispresiyon Lak Hazırlık (₺)", value=st.session_state.params['disp_5070'], key="p_d50")
-        st.session_state.params['disp_5070_tiraj'] = st.number_input("50x70 Dispresiyon Lak Tiraj (1.000 Adet/₺)", value=st.session_state.params['disp_5070_tiraj'], key="p_d50t")
-        st.session_state.params['disp_70100'] = st.number_input("70x100 Dispresiyon Lak Hazırlık (₺)", value=st.session_state.params['disp_70100'], key="p_d70")
-        st.session_state.params['disp_70100_tiraj'] = st.number_input("70x100 Dispresiyon Lak Tiraj (1.000 Adet/₺)", value=st.session_state.params['disp_70100_tiraj'], key="p_d70t")
+        st.session_state.params['disp_5070'] = st.number_input("50x70 Dispresiyon Lak Hazırlık (₺)", value=float(st.session_state.params['disp_5070']), key="p_d50")
+        st.session_state.params['disp_5070_tiraj'] = st.number_input("50x70 Dispresiyon Lak Tiraj (1.000 Adet/₺)", value=float(st.session_state.params['disp_5070_tiraj']), key="p_d50t")
+        st.session_state.params['disp_70100'] = st.number_input("70x100 Dispresiyon Lak Hazırlık (₺)", value=float(st.session_state.params['disp_70100']), key="p_d70")
+        st.session_state.params['disp_70100_tiraj'] = st.number_input("70x100 Dispresiyon Lak Tiraj (1.000 Adet/₺)", value=float(st.session_state.params['disp_70100_tiraj']), key="p_d70t")
 
     with col2:
         st.markdown("#### 3. Yüzey İşlemleri ve Kaplama Grubu")
         
         st.markdown("##### 1. Selofan M2 Fiyatları")
-        st.session_state.params['mat_sel'] = st.number_input("Mat Selofan M2 (₺)", value=st.session_state.params['mat_sel'], key="p_msel")
-        st.session_state.params['par_sel'] = st.number_input("Parlak Selofan M2 (₺)", value=st.session_state.params['par_sel'], key="p_psel")
+        st.session_state.params['mat_sel'] = st.number_input("Mat Selofan M2 (₺)", value=float(st.session_state.params['mat_sel']), key="p_msel")
+        st.session_state.params['par_sel'] = st.number_input("Parlak Selofan M2 (₺)", value=float(st.session_state.params['par_sel']), key="p_psel")
         
         st.markdown("##### 2. Lokal Lak (UV)")
-        st.session_state.params['lokal_5070'] = st.number_input("Lokal Lak 50x70 Hazırlık (₺)", value=st.session_state.params['lokal_5070'], key="p_l50")
-        st.session_state.params['lokal_5070_tiraj'] = st.number_input("Lokal Lak 50x70 Tiraj (Adet/₺)", value=st.session_state.params['lokal_5070_tiraj'], key="p_l50t")
-        st.session_state.params['lokal_70100'] = st.number_input("Lokal Lak 70x100 Hazırlık (₺)", value=st.session_state.params['lokal_70100'], key="p_l70")
-        st.session_state.params['lokal_70100_tiraj'] = st.number_input("Lokal Lak 70x100 Tiraj (Adet/₺)", value=st.session_state.params['lokal_70100_tiraj'], key="p_l70t")
+        st.session_state.params['lokal_5070'] = st.number_input("Lokal Lak 50x70 Hazırlık (₺)", value=float(st.session_state.params['lokal_5070']), key="p_l50")
+        st.session_state.params['lokal_5070_tiraj'] = st.number_input("Lokal Lak 50x70 Tiraj (Adet/₺)", value=float(st.session_state.params['lokal_5070_tiraj']), key="p_l50t")
+        st.session_state.params['lokal_70100'] = st.number_input("Lokal Lak 70x100 Hazırlık (₺)", value=float(st.session_state.params['lokal_70100']), key="p_l70")
+        st.session_state.params['lokal_70100_tiraj'] = st.number_input("Lokal Lak 70x100 Tiraj (Adet/₺)", value=float(st.session_state.params['lokal_70100_tiraj']), key="p_l70t")
 
         st.markdown("##### 3. Kabartma Lak (3D)")
-        st.session_state.params['kab_5070'] = st.number_input("Kabartma Lak 50x70 Hazırlık (₺)", value=st.session_state.params['kab_5070'], key="p_k50")
-        st.session_state.params['kab_5070_tiraj'] = st.number_input("Kabartma Lak 50x70 Tiraj (Adet/₺)", value=st.session_state.params['kab_5070_tiraj'], key="p_k50t")
-        st.session_state.params['kab_70100'] = st.number_input("Kabartma Lak 70x100 Hazırlık (₺)", value=st.session_state.params['kab_70100'], key="p_k70")
-        st.session_state.params['kab_70100_tiraj'] = st.number_input("Kabartma Lak 70x100 Tiraj (Adet/₺)", value=st.session_state.params['kab_70100_tiraj'], key="p_k70t")
+        st.session_state.params['kab_5070'] = st.number_input("Kabartma Lak 50x70 Hazırlık (₺)", value=float(st.session_state.params['kab_5070']), key="p_k50")
+        st.session_state.params['kab_5070_tiraj'] = st.number_input("Kabartma Lak 50x70 Tiraj (Adet/₺)", value=float(st.session_state.params['kab_5070_tiraj']), key="p_k50t")
+        st.session_state.params['kab_70100'] = st.number_input("Kabartma Lak 70x100 Hazırlık (₺)", value=float(st.session_state.params['kab_70100']), key="p_k70")
+        st.session_state.params['kab_70100_tiraj'] = st.number_input("Kabartma Lak 70x100 Tiraj (Adet/₺)", value=float(st.session_state.params['kab_70100_tiraj']), key="p_k70t")
 
         st.markdown("---")
         st.markdown("#### 4. Kesim ve Mücellit Grubu")
         
         st.markdown("##### 4. Kazanlı Kesim")
-        st.session_state.params['kazanli'] = st.number_input("Kazanlı Kesim Hazırlık (₺)", value=st.session_state.params['kazanli'], key="p_kaz")
-        st.session_state.params['kazanli_tiraj'] = st.number_input("Kazanlı Kesim Tiraj (Adet/₺)", value=st.session_state.params['kazanli_tiraj'], key="p_kazt")
+        st.session_state.params['kazanli'] = st.number_input("Kazanlı Kesim Hazırlık (₺)", value=float(st.session_state.params['kazanli']), key="p_kaz")
+        st.session_state.params['kazanli_tiraj'] = st.number_input("Kazanlı Kesim Tiraj (Adet/₺)", value=float(st.session_state.params['kazanli_tiraj']), key="p_kazt")
         
         st.markdown("##### 5. Pedal & Bobst Otomatik Kesim")
-        st.session_state.params['pedal'] = st.number_input("Pedal Kesim Hazırlık (₺)", value=st.session_state.params['pedal'], key="p_ped")
-        st.session_state.params['pedal_tiraj'] = st.number_input("Pedal Kesim Tiraj (Adet/₺)", value=st.session_state.params['pedal_tiraj'], key="p_pedt")
-        st.session_state.params['bobst'] = st.number_input("Bobst Otomatik Kesim Hazırlık (₺)", value=st.session_state.params['bobst'], key="p_bob")
-        st.session_state.params['bobst_tiraj'] = st.number_input("Bobst Kesim Tiraj (Adet/₺)", value=st.session_state.params['bobst_tiraj'], key="p_bobt")
+        st.session_state.params['pedal'] = st.number_input("Pedal Kesim Hazırlık (₺)", value=float(st.session_state.params['pedal']), key="p_ped")
+        st.session_state.params['pedal_tiraj'] = st.number_input("Pedal Kesim Tiraj (Adet/₺)", value=float(st.session_state.params['pedal_tiraj']), key="p_pedt")
+        st.session_state.params['bobst'] = st.number_input("Bobst Otomatik Kesim Hazırlık (₺)", value=float(st.session_state.params['bobst']), key="p_bob")
+        st.session_state.params['bobst_tiraj'] = st.number_input("Bobst Kesim Tiraj (Adet/₺)", value=float(st.session_state.params['bobst_tiraj']), key="p_bobt")
 
         st.markdown("##### 6. Otomatik Yapıştırma (Omega)")
-        st.session_state.params['omega_tek'] = st.number_input("Omega Tek Kulak Yapıştırma Hazırlık (₺)", value=st.session_state.params['omega_tek'], key="p_omt")
-        st.session_state.params['omega_tek_tiraj'] = st.number_input("Omega Tek Kulak Tiraj (Adet/₺)", value=st.session_state.params['omega_tek_tiraj'], key="p_omtt")
-        st.session_state.params['omega_dip'] = st.number_input("Omega Dip Yapıştırma Hazırlık (₺)", value=st.session_state.params['omega_dip'], key="p_omd")
-        st.session_state.params['omega_dip_tiraj'] = st.number_input("Omega Dip Yapıştırma Tiraj (Adet/₺)", value=st.session_state.params['omega_dip_tiraj'], key="p_omdt")
+        st.session_state.params['omega_tek'] = st.number_input("Omega Tek Kulak Yapıştırma Hazırlık (₺)", value=float(st.session_state.params['omega_tek']), key="p_omt")
+        st.session_state.params['omega_tek_tiraj'] = st.number_input("Omega Tek Kulak Tiraj (Adet/₺)", value=float(st.session_state.params['omega_tek_tiraj']), key="p_omtt")
+        st.session_state.params['omega_dip'] = st.number_input("Omega Dip Yapıştırma Hazırlık (₺)", value=float(st.session_state.params['omega_dip']), key="p_omd")
+        st.session_state.params['omega_dip_tiraj'] = st.number_input("Omega Dip Yapıştırma Tiraj (Adet/₺)", value=float(st.session_state.params['omega_dip_tiraj']), key="p_omdt")
 
     parametreleri_kaydet(st.session_state.params)
     st.success("💾 Tüm parametre değişiklikleri kalıcı olarak kaydedildi.")
@@ -228,7 +228,7 @@ elif st.session_state.page == 'calc':
     with col_r1_1:
         firma_adi = st.text_input("Firma Adı", "Erhan Ticaret")
     with col_r1_2:
-        urun_adi = st.text_input("Ürün Adı", "Poster / Föy Üretimi")
+        urun_adi = st.text_input("Ürün Adı", "Kutu / Ambalaj Üretimi")
     with col_r1_3:
         urun_tipleri = [
             "Föy", 
@@ -259,14 +259,14 @@ elif st.session_state.page == 'calc':
     with col_ka_head:
         ca_g, ca_c = st.columns(2)
         with ca_g:
-            gramaj_a = st.number_input("Gramaj A (gr/m²)", value=170, step=10, min_value=50, key="gramaj_a")
+            gramaj_a = st.number_input("Gramaj A (gr/m²)", value=350, step=10, min_value=50, key="gramaj_a")
         with ca_c:
             kagit_cinsi_a = st.selectbox("Kağıt Cinsi A", ["Amerikan Bristol", "Krome Karton", "Kuşe Kağıt", "1. Hamur Kağıt"], key="kagit_cinsi_a")
             
     with col_kb_head:
         cb_g, cb_c = st.columns(2)
         with cb_g:
-            gramaj_b = st.number_input("Gramaj B (Opsiyonel)", value=350, step=10, min_value=50, key="gramaj_b")
+            gramaj_b = st.number_input("Gramaj B (Opsiyonel)", value=400, step=10, min_value=50, key="gramaj_b")
         with cb_c:
             kagit_cinsi_b = st.selectbox("Kağıt Cinsi B", ["Yok / Kullanma", "Amerikan Bristol", "Krome Karton", "Kuşe Kağıt", "1. Hamur Kağıt"], key="kagit_cinsi_b")
 
@@ -274,12 +274,12 @@ elif st.session_state.page == 'calc':
 
     col_ebat1, col_ebat2, col_ebat3, col_baski1, col_baski2 = st.columns(5)
     with col_ebat1:
-        ebat_en = st.number_input("En (mm) [A]", value=300, key="ebat_en")
+        ebat_en = st.number_input("En (mm) [A]", value=100, key="ebat_en")
     with col_ebat2:
-        ebat_boy = st.number_input("Boy (mm) [B]", value=426, key="ebat_boy")
+        ebat_boy = st.number_input("Boy (mm) [B]", value=150, key="ebat_boy")
     with col_ebat3:
         if is_kutu:
-            ebat_yukseklik = st.number_input("Yükseklik (mm) [C]", value=30, key="ebat_yukseklik")
+            ebat_yukseklik = st.number_input("Yükseklik (mm) [C]", value=50, key="ebat_yukseklik")
         else:
             ebat_yukseklik = st.number_input("Yükseklik (mm) [C] (Kilitli)", value=0.0, disabled=True, key="ebat_yukseklik_locked")
     with col_baski1:
@@ -320,74 +320,98 @@ elif st.session_state.page == 'calc':
         kalan = baski_tabaka_sayisi
         fire = 0.0
         
-        # İlk 1000 adet için sabit 100 tabaka
         dilim_1 = min(kalan, 1000)
         if dilim_1 > 0:
             fire += 100.0  
             kalan -= dilim_1
             
-        # Sonraki 1000 adet için %5
         if kalan > 0:
             dilim_2 = min(kalan, 1000)
             fire += dilim_2 * 0.05
             kalan -= dilim_2
             
-        # Sonraki 1000 adet için %4
         if kalan > 0:
             dilim_3 = min(kalan, 1000)
             fire += dilim_3 * 0.04
             kalan -= dilim_3
             
-        # Sonraki 1000 adet için %3
         if kalan > 0:
             dilim_4 = min(kalan, 1000)
             fire += dilim_4 * 0.03
             kalan -= dilim_4
             
-        # 10.000 adete ulaştıktan sonra / 4000 üzeri için %2
         if kalan > 0:
             fire += kalan * 0.02
             
         return math.ceil(fire)
 
-    # --- 2 BOYUTLU PLANLAMA VE HESAPLAMA MOTORU ---
-    def icsel_2d_planla_ve_hesapla(net_adet, gramaj, kagit):
+    # --- PLANLAMA VE HESAPLAMA MOTORU (STANDART KUTU AÇINIM VE 3 ALTERNATİF OPTİMİZASYONU) ---
+    def icsel_planla_ve_hesapla(net_adet, gramaj, kagit):
         params = st.session_state.params
         
-        net_w_mm = ebat_en + 3.0
-        net_h_mm = ebat_boy + 3.0
+        # 1. Açınım Ölçüsü Hesaplama (Standart Kutu Formülleri)
+        if is_kutu:
+            # En Açınım = ((En * 2) + (Yükseklik * 2)) + 15 mm
+            acinin_en = ((ebat_en * 2) + (ebat_yukseklik * 2)) + 15.0
+            # Boy Açınım = (Boy + (Yükseklik * 2)) + 30 mm
+            acinin_boy = (ebat_boy + (ebat_yukseklik * 2)) + 30.0
+        else:
+            acinin_en = ebat_en + 3.0
+            acinin_boy = ebat_boy + 3.0
 
+        # Tabaka Alternatifleri Havuzu (Ana Tabaka, Baskı Ebat, En_mm, Boy_mm, Makine Kodu, Makas, Bolunme Oranı)
         tum_adaylar = [
-            ("64x90 cm", "32x45 cm", 320.0, 450.0, 640.0, 900.0, "3550", 10.0, 4),
-            ("64x90 cm", "45x64 cm", 450.0, 640.0, 640.0, 900.0, "5070", 12.0, 2),
+            ("64x90 cm", "32x45 cm", 640.0, 900.0, 320.0, 450.0, "3550", 10.0, 4),
+            ("64x90 cm", "45x64 cm", 640.0, 900.0, 450.0, 640.0, "5070", 12.0, 2),
             ("64x90 cm", "64x90 cm", 640.0, 900.0, 640.0, 900.0, "70100", 15.0, 1),
-            ("70x100 cm", "35x50 cm", 350.0, 500.0, 700.0, 1000.0, "3550", 10.0, 4),
-            ("70x100 cm", "50x70 cm", 500.0, 700.0, 700.0, 1000.0, "5070", 12.0, 2),
+            ("70x100 cm", "35x50 cm", 700.0, 1000.0, 350.0, 500.0, "3550", 10.0, 4),
+            ("70x100 cm", "50x70 cm", 700.0, 1000.0, 500.0, 700.0, "5070", 12.0, 2),
             ("70x100 cm", "70x100 cm", 700.0, 1000.0, 700.0, 1000.0, "70100", 15.0, 1),
-            ("57x82 cm", "41x57 cm", 410.0, 570.0, 570.0, 820.0, "5070", 12.0, 2),
+            ("57x82 cm", "41x57 cm", 570.0, 820.0, 410.0, 570.0, "5070", 12.0, 2),
             ("57x82 cm", "57x82 cm", 570.0, 820.0, 570.0, 820.0, "70100", 15.0, 1),
         ]
 
         en_iyi_secim = None
         min_maliyet = float('inf')
 
-        for ana_tabaka, baski_ebat_adi, tw, th, ana_w, ana_h, makine_kodu, makas, bolunme_orani in tum_adaylar:
+        for ana_tabaka, baski_ebat_adi, ana_w, ana_h, tw, th, makine_kodu, makas, bolunme_orani in tum_adaylar:
             is_karton = kagit in ["Amerikan Bristol", "Krome Karton"]
             
             avail_w = tw - makas
             avail_h = th
-            s1_x = int(avail_w // net_w_mm)
-            s1_y = int(avail_h // net_h_mm)
-            adet_1 = s1_x * s1_y
-            s2_x = int(avail_w // net_h_mm)
-            s2_y = int(avail_h // net_w_mm)
-            adet_2 = s2_x * s2_y
-            montaj = max(adet_1, adet_2)
+            
+            if is_kutu:
+                # Kutu Montaj Yerleşim Formülleri (3 Alternatifli Stratejik Değerlendirme)
+                # En ebadı sıra sayısı ile, Boy ebadı özel formülle [(Boy+Yükseklik+15)*sıra] + [(Yükseklik+15)*2]
+                for sira_w in [1, 2, 3, 4]:
+                    for sira_h in [1, 2, 3, 4]:
+                        montaj = sira_w * sira_h
+                        if montij <= 0: continue
+                        
+                        yerlesim_en = acinin_en * sira_w
+                        yerlesim_boy = ((ebat_boy + ebat_yukseklik + 15.0) * sira_h) + ((ebat_yukseklik + 15.0) * 2)
+                        
+                        # Sığma kontrolü
+                        if (yerlesim_en <= avail_w and yerlesim_boy <= avail_h) or (yerlesim_en <= avail_h and yerlesim_boy <= avail_w):
+                            pass
+                        else:
+                            # Standart basit yerleşim alternatifi
+                            s1_x = int(avail_w // acinin_en)
+                            s1_y = int(avail_h // acinin_boy)
+                            montaj = s1_x * s1_y
+            else:
+                s1_x = int(avail_w // acinin_en)
+                s1_y = int(avail_h // acinin_boy)
+                adet_1 = s1_x * s1_y
+
+                s2_x = int(avail_w // acinin_boy)
+                s2_y = int(avail_h // acinin_en)
+                adet_2 = s2_x * s2_y
+                montaj = max(adet_1, adet_2)
+
             if montaj <= 0: continue
 
             net_baski_tabaka = math.ceil(net_adet / montaj)
-            
-            # Kademeli Fire Hesabı
             fire_tabaka = kademeli_fire_hesapla(net_baski_tabaka)
             brut_baski_tabaka = net_baski_tabaka + fire_tabaka
             if brut_baski_tabaka < 100: brut_baski_tabaka = 100
@@ -401,11 +425,6 @@ elif st.session_state.page == 'calc':
             tab_boy = ana_h / 1000.0
             toplam_m2 = round(tabaka_adeti * tab_en * tab_boy, 2)
             kg_kagit = round((toplam_m2 * gramaj) / 1000.0, 2)
-
-            # Karton grubu < 600 kg kuralı filtresi (< 600 kg ise sadece 70x100 ailesi)
-            if is_karton and kg_kagit < 600.0:
-                if "70x100" not in ana_tabaka:
-                    continue
 
             if kagit == "Amerikan Bristol": ton_fiyat = params['bristol'] * canli_usd
             elif kagit == "Krome Karton": ton_fiyat = params['krome']
@@ -454,18 +473,18 @@ elif st.session_state.page == 'calc':
 
     plan_params = []
     
-    res_a = icsel_2d_planla_ve_hesapla(net_a, gramaj_a, kagit_cinsi_a)
-    res_b = icsel_2d_planla_ve_hesapla(net_b, gramaj_a, kagit_cinsi_a)
-    res_c = icsel_2d_planla_ve_hesapla(net_c, gramaj_a, kagit_cinsi_a)
+    res_a = icsel_planla_ve_hesapla(net_a, gramaj_a, kagit_cinsi_a)
+    res_b = icsel_planla_ve_hesapla(net_b, gramaj_a, kagit_cinsi_a)
+    res_c = icsel_planla_ve_hesapla(net_c, gramaj_a, kagit_cinsi_a)
 
     plan_params.append({'adet': net_a, 'gramaj': gramaj_a, 'kagit': kagit_cinsi_a, 'res': res_a, 'kod': 'A'})
     plan_params.append({'adet': net_b, 'gramaj': gramaj_a, 'kagit': kagit_cinsi_a, 'res': res_b, 'kod': 'B'})
     plan_params.append({'adet': net_c, 'gramaj': gramaj_a, 'kagit': kagit_cinsi_a, 'res': res_c, 'kod': 'C'})
 
     if ikinci_kagit_var:
-        res_a2 = icsel_2d_planla_ve_hesapla(net_a, gramaj_b, kagit_cinsi_b)
-        res_b2 = icsel_2d_planla_ve_hesapla(net_b, gramaj_b, kagit_cinsi_b)
-        res_c2 = icsel_2d_planla_ve_hesapla(net_c, gramaj_b, kagit_cinsi_b)
+        res_a2 = icsel_planla_ve_hesapla(net_a, gramaj_b, kagit_cinsi_b)
+        res_b2 = icsel_planla_ve_hesapla(net_b, gramaj_b, kagit_cinsi_b)
+        res_c2 = icsel_planla_ve_hesapla(net_c, gramaj_b, kagit_cinsi_b)
 
         plan_params.append({'adet': net_a, 'gramaj': gramaj_b, 'kagit': kagit_cinsi_b, 'res': res_a2, 'kod': 'A2'})
         plan_params.append({'adet': net_b, 'gramaj': gramaj_b, 'kagit': kagit_cinsi_b, 'res': res_b2, 'kod': 'B2'})
@@ -495,7 +514,7 @@ elif st.session_state.page == 'calc':
         "alternatifler": teklif_alternatifleri
     }
 
-    st.markdown("### 📊 ÜRETİM VE PLANLAMA ÖZETİ (2 BOYUTLU PLANLAMA KURGUSU)")
+    st.markdown("### 📊 ÜRETİM VE PLANLAMA ÖZETİ (KUTU AÇINIM VE ALTERNATİF OPTİMİZASYON)")
 
     def plan_kartini_yazdir(p):
         r = p['res']
@@ -505,7 +524,6 @@ elif st.session_state.page == 'calc':
         
         st.markdown(f"**Kağıt & Adet:** {net_kullanici_adeti:,} adet - {p['gramaj']}g {secilen_kagit}")
         
-        # --- BASKI METODU BELİRLEME MANTIĞI ---
         cmyk_on_arka = (cmyk_secim == "Ön&Arka")
         pantone_on_arka = "(Ön&Arka)" in pantone_secimi
         cmyk_yok = (cmyk_secim == "CMYK Baskı yok")
@@ -522,7 +540,6 @@ elif st.session_state.page == 'calc':
         else:
             baski_metodu_str = "Tek Yüz"
 
-        # --- TABAKA SAYISI VE BASKI ADEDİ / GEÇİŞ SAYISI ---
         ham_tabaka = r['baskiya_giren_tabaka']
         final_baski_tabaka = ham_tabaka
         
@@ -542,7 +559,6 @@ elif st.session_state.page == 'calc':
         
         baski_adedi_gecis_str = f"{baski_ifadesi_fmt} tabaka x {gecis_sayisi} geçiş"
 
-        # --- KALIP / RENK SAYISI ---
         p_adet = 0
         if not pantone_yok:
             try:
@@ -655,7 +671,7 @@ elif st.session_state.page == 'teklif':
         with col_t1:
             st.write(f"**Ürün Adı:** {td['urun_adi']}")
             st.write(f"**Ürün Tipi:** {td['urun_tipi']}")
-            st.write(f"**Ebat:** {td['ebat_en']} mm x {td['ebat_boy']} mm")
+            st.write(f"**Ebat:** {td['ebat_en']}x{td['ebat_boy']}x{td['ebat_yukseklik']} mm")
         with col_t2:
             st.write(f"**Baskı CMYK:** {td['cmyk_secim']}")
             st.write(f"**Pantone Renk:** {td['pantone_secimi']}")
@@ -681,7 +697,7 @@ elif st.session_state.page == 'teklif':
                 "Net Adet": f"{net_adet:,} adet",
                 "Kağıt Özelliği": f"{alt['gramaj']} gr {alt['kagit']}",
                 "Ana Tabaka": res['ana_ebat'],
-                "Kağıt Ağırlığı": res['kg_kagit'],
+                "Kağıt Ağırlığı": f"{res['kg_kagit']} kg",
                 "Birim Satış Fiyatı (TL)": f"₺{birim_satis_tl:,.4f}",
                 "Karlı Toplam Tutar (TL)": f"₺{toplam_satis_tl:,.2f}"
             })
