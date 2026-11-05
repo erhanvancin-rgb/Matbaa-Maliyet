@@ -289,13 +289,13 @@ elif st.session_state.page == 'calc':
         elif machine_code == "5070": return 12.0
         else: return 10.0
 
-    # --- DİNAMİK BOBİN ÜRETİCİSİ ---
+    # --- ÇOKLU SENARYO / ALTERNATİF BOBİN ÜRETİCİSİ ---
     def bobin_adaylarini_uret():
         cands = []
         enler = [550, 600, 650, 700]
         for e in enler:
             start_b = max(e, 600) if e != 550 else 600
-            for b in range(start_b, 1001, 50):
+            for b in range(start_b, 1001, 25): # Adımları 25mm yaparak çoklu alternatif üretiyoruz (örn: 60x85, 60x90 vb.)
                 if e == 700 and b > 950: continue
                 ana_w, ana_h = float(e), float(b)
                 ana_isim = f"Bobin Kesim {int(e//10)}x{int(b//10)} cm"
@@ -320,7 +320,7 @@ elif st.session_state.page == 'calc':
                 cands.append((ana_isim, f"{ana_w/10:.1f}x{h3/10:.1f} cm".replace(".0",""), ana_w, ana_h, ana_w, h3, m_code_5, get_makas(m_code_5), 3))
         return cands
 
-    # --- PLANLAMA MOTORU ---
+    # --- PLANLAMA MOTORU (ÇOKLU ALTERNATİF YARIŞMASI) ---
     def icsel_planla_ve_hesapla(net_adet, gramaj, kagit):
         params = st.session_state.params
         
@@ -333,7 +333,6 @@ elif st.session_state.page == 'calc':
 
         is_karton = kagit in ["Amerikan Bristol", "Krome Karton"]
         
-        # Kesin Makine Kodlu ve Dinamik Makaslı Standart Tabaka Havuzu
         standart_adaylar = [
             ("70x100 cm", "33,3x35 cm", 700.0, 1000.0, 333.0, 350.0, get_machine_code(333.0, 350.0), get_makas(get_machine_code(333.0, 350.0)), 6),
             ("70x100 cm", "35x50 cm", 700.0, 1000.0, 350.0, 500.0, get_machine_code(350.0, 500.0), get_makas(get_machine_code(350.0, 500.0)), 4),
@@ -374,7 +373,6 @@ elif st.session_state.page == 'calc':
                             m_deneme = sira_w * sira_h
                             if m_deneme <= 0: continue
                             
-                            # KÖKLÜ HATA BURADA ÇÖZÜLDÜ: İç içe geçme formülü iptal edildi. Net açınım üzerinden matematiksel montaj.
                             yerlesim_en = acinin_en * sira_w
                             yerlesim_boy = acinin_boy * sira_h
                             
@@ -443,15 +441,14 @@ elif st.session_state.page == 'calc':
                         "makine_kodu": makine_kodu
                     }
 
-        # 1. Standart tabakaları dene
+        # 1. Standart tabakaları değerlendir
         adaylari_degerlendir(standart_adaylar)
 
-        # 2. 600 KG Bobin Kuralı ve Dinamik Kesim Değerlendirmesi
+        # 2. 600 KG Bobin Kuralı ve Çoklu Alternatif Bobin Yarışması
         geici_kg = en_iyi_secim['kg_kagit'] if en_iyi_secim else 0.0
-        
         if is_karton and geici_kg >= 600.0:
-            dinamik_bobinler = bobin_adaylarini_uret()
-            adaylari_degerlendir(dinamik_bobinler)
+            coklu_bobinler = bobin_adaylarini_uret()
+            adaylari_degerlendir(coklu_bobinler)
 
         if en_iyi_secim is None:
             en_iyi_secim = {
@@ -494,7 +491,7 @@ elif st.session_state.page == 'calc':
         "kar_orani": kar_orani, "alternatifler": teklif_alternatifleri
     }
 
-    st.markdown("### 📊 ÜRETİM VE PLANLAMA ÖZETİ (PRO MOD: KÖK HATA ÇÖZÜLDÜ)")
+    st.markdown("### 📊 ÜRETİM VE PLANLAMA ÖZETİ (ÇOKLU SENARYO REKABETÇİ OPTİMİZASYON)")
 
     def plan_kartini_yazdir(p):
         r = p['res']
