@@ -345,7 +345,7 @@ elif st.session_state.page == 'calc':
             
         return math.ceil(fire)
 
-    # --- PLANLAMA VE HESAPLAMA MOTORU (STANDART KUTU AÇINIM VE 3 ALTERNATİF OPTİMİZASYONU) ---
+    # --- PLANLAMA VE HESAPLAMA MOTORU (EBAT HAVUZLARI VE 3 ALTERNATİF OPTİMİZASYON) ---
     def icsel_planla_ve_hesapla(net_adet, gramaj, kagit):
         params = st.session_state.params
         
@@ -357,23 +357,57 @@ elif st.session_state.page == 'calc':
             acinin_en = ebat_en + 3.0
             acinin_boy = ebat_boy + 3.0
 
-        tum_adaylar = [
-            ("64x90 cm", "32x45 cm", 640.0, 900.0, 320.0, 450.0, "3550", 10.0, 4),
-            ("64x90 cm", "45x64 cm", 640.0, 900.0, 450.0, 640.0, "5070", 12.0, 2),
-            ("64x90 cm", "64x90 cm", 640.0, 900.0, 640.0, 900.0, "70100", 15.0, 1),
-            ("70x100 cm", "35x50 cm", 700.0, 1000.0, 350.0, 500.0, "3550", 10.0, 4),
-            ("70x100 cm", "50x70 cm", 700.0, 1000.0, 500.0, 700.0, "5070", 12.0, 2),
-            ("70x100 cm", "70x100 cm", 700.0, 1000.0, 700.0, 1000.0, "70100", 15.0, 1),
-            ("57x82 cm", "41x57 cm", 570.0, 820.0, 410.0, 570.0, "5070", 12.0, 2),
-            ("57x82 cm", "57x82 cm", 570.0, 820.0, 570.0, 820.0, "70100", 15.0, 1),
-        ]
+        # Ebat Havuzu Tanımlama (Kartonlar vs Kuşe/Hamur ayrımı)
+        is_karton = kagit in ["Amerikan Bristol", "Krome Karton"]
+        
+        tum_adaylar = []
+        
+        if is_karton:
+            # Karton Grubu Ebatları (70x100 ailesi + Bobin kesimler)
+            karton_ebatlar = [
+                # Standartlar
+                ("70x100 cm", "35x50 cm", 700.0, 1000.0, 350.0, 500.0, "3550", 10.0, 4),
+                ("70x100 cm", "50x70 cm", 700.0, 1000.0, 500.0, 700.0, "5070", 12.0, 2),
+                ("70x100 cm", "70x100 cm", 700.0, 1000.0, 700.0, 1000.0, "70100", 15.0, 1),
+                ("70x100 cm", "33,3x70 cm", 700.0, 1000.0, 333.0, 700.0, "3550", 10.0, 3),
+                ("70x100 cm", "35x65 cm", 700.0, 1000.0, 350.0, 650.0, "3550", 10.0, 4),
+                ("70x100 cm", "23x50 cm", 700.0, 1000.0, 230.0, 500.0, "3550", 10.0, 6),
+                ("70x100 cm", "25x45 cm", 700.0, 1000.0, 250.0, 450.0, "3550", 10.0, 6),
+            ]
+            
+            # Bobin Kesim Ebatları (55, 60, 65, 70 serileri)
+            seriler = [550, 600, 650, 700]
+            boylar = [600, 650, 700, 750, 800, 850, 900, 950, 1000]
+            for s in seriler:
+                for b in boylar:
+                    if s == 700 and b > 950: continue # 70x95 üstü yok
+                    # Makine kodu ve bölunme belirleme
+                    mk = "3550" if s <= 500 and b <= 700 else ("5070" if max(s, b) <= 700 else "70100")
+                    bol = 1 if max(s, b) > 700 else 2
+                    karton_ebatlar.append((f"Bobin Kesim {s//10}x{b//10} cm", f"{s//10}x{b//10} cm", float(s), float(b), float(s), float(b), mk, 12.0, bol))
+            
+            tum_adaylar = karton_ebatlar
+        else:
+            # Kuşe ve 1. Hamur Ebatları (64x90, 70x100 ve 170gr altı için 57x82)
+            kuse_hamur_ebatlar = [
+                ("64x90 cm", "32x45 cm", 640.0, 900.0, 320.0, 450.0, "3550", 10.0, 4),
+                ("64x90 cm", "45x64 cm", 640.0, 900.0, 450.0, 640.0, "5070", 12.0, 2),
+                ("64x90 cm", "64x90 cm", 640.0, 900.0, 640.0, 900.0, "70100", 15.0, 1),
+                ("70x100 cm", "35x50 cm", 700.0, 1000.0, 350.0, 500.0, "3550", 10.0, 4),
+                ("70x100 cm", "50x70 cm", 700.0, 1000.0, 500.0, 700.0, "5070", 12.0, 2),
+                ("70x100 cm", "70x100 cm", 700.0, 1000.0, 700.0, 1000.0, "70100", 15.0, 1),
+            ]
+            if gramaj <= 170:
+                kuse_hamur_ebatlar.extend([
+                    ("57x82 cm", "41x57 cm", 570.0, 820.0, 410.0, 570.0, "5070", 12.0, 2),
+                    ("57x82 cm", "57x82 cm", 570.0, 820.0, 570.0, 820.0, "70100", 15.0, 1),
+                ])
+            tum_adaylar = kuse_hamur_ebatlar
 
         en_iyi_secim = None
         min_maliyet = float('inf')
 
         for ana_tabaka, baski_ebat_adi, ana_w, ana_h, tw, th, makine_kodu, makas, bolunme_orani in tum_adaylar:
-            is_karton = kagit in ["Amerikan Bristol", "Krome Karton"]
-            
             avail_w = tw - makas
             avail_h = th
             
