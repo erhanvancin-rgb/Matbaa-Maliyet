@@ -618,7 +618,7 @@ elif st.session_state.page == 'calc':
             {"Parametre / Kriter": "Montaj Planı", "Değer": f"1 Tabakada {r['montaj_adedi']} Ürün ({urun_tipi})"},
             {"Parametre / Kriter": "Tabaka Ebadı ve Sayısı", "Değer": f"{p['ebat']} ({r['tabaka_adeti']:,} tabaka)"},
             {"Parametre / Kriter": "Baskı Ebadı ve Sayısı", "Değer": r['baski_kalip_metni']},
-            {"Parametre / Kriter": "Baskıya Girecek Kağıt Ebadı ve Sayısı", "Değer": f"{p['ebat'].split(' (')[0]} {r['tabaka_adeti']:,:,.0f} Tabaka".replace(',', '.')},
+            {"Parametre / Kriter": "Baskıya Girecek Kağıt Ebadı ve Sayısı", "Değer": f"{p['ebat'].split(' (')[0]} {f"{r['tabaka_adeti']:,}".replace(',', '.')} Tabaka"},
             {"Parametre / Kriter": "Kağıt Kilogram (kg)", "Değer": f"{r['kg_kagit']} kg"},
             {"Parametre / Kriter": "Baskı Adedi ve Geçiş Sayısı", "Değer": f"{r['tabaka_adeti']:,} tabaka x {r['gecis_sayisi']} geçiş"},
             {"Parametre / Kriter": "Baskı Metodu", "Değer": r['gercek_baski_yuzu']},
