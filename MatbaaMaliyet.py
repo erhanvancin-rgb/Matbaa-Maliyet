@@ -230,7 +230,6 @@ elif st.session_state.page == 'calc':
         kutu_acik_en = (en * 2.0) + (yukseklik * 2.0) + 15.0
         
         for s_en in range(1, 15):
-            # Dip kilitli kutularda s_boy (dikey sıra) kilitlenme simetrisi için ÇİFT sayı olmalıdır (1/9 hatasını önler)
             boy_range = range(2, 15, 2) if kutu_formu in ["Dip Kilitli Kutu", "Dip Kilit Yapıştırmalı Kutu", "Dip Yapıştırmalı Kutu"] else range(1, 15)
             
             for s_boy in boy_range:
@@ -291,13 +290,11 @@ elif st.session_state.page == 'calc':
             tabaka_adeti = 100
 
         gecis_sayisi = 1
-        
-        # --- DOĞRU KALIP SAYISI HESABI (Tek Yüz 4, Çift Yüz 8) ---
         is_cift_yuz = baski_yuzu in ["Çift Yüz", "Ön ve Arka Baskı", "Çift Yüz (Normal)"]
         if is_cift_yuz and gercek_baski_yuzu != "Revolta Baskı":
-            kalıp_sayisi = 8  # 4 ön + 4 arka
+            kalıp_sayisi = 8  
         else:
-            kalıp_sayisi = 4  # Tek yüz veya revolta tek kalıp seti
+            kalıp_sayisi = 4  
 
         has_pantone = pantone_secimi != "Yok"
         if has_pantone:
@@ -393,6 +390,15 @@ elif st.session_state.page == 'calc':
 
         toplam_uretim_maliyeti = kagit_maliyeti + baski_maliyeti + yuzey_lak_toplam + kesim_maliyeti
 
+        # Baskı Ebadı / Kalıp Metni Belirleme
+        max_boy = max(tab_en_mm, tab_boy_mm)
+        if max_boy <= 500:
+            makine_adi_str = "35x50"
+        elif max_boy <= 700:
+            makine_adi_str = "50x70"
+        else:
+            makine_adi_str = "70x100"
+
         return {
             "brut_adet": brut_adet,
             "fire_pct": fire_pct,
@@ -410,38 +416,48 @@ elif st.session_state.page == 'calc':
             "kesim_maliyeti": kesim_maliyeti,
             "toplam_uretim_maliyeti": toplam_uretim_maliyeti,
             "gercek_baski_yuzu": gercek_baski_yuzu,
-            "makine_kodu": makine_kodu
+            "makine_kodu": makine_kodu,
+            "baski_kalip_metni": f"{kalıp_sayisi} Kalıp {makine_adi_str}"
         }
 
-    # 2. OPTİMİZASYON VE EBAT FİLTRELEME MOTORU (BRİSTOL/KROME VE 57x82 SINIRLAMASI)
     def makine_ve_ebat_sec_optimum(adet, gramaj, kagit):
         adaylar = []
         
-        # KAĞIT CİNSİNE GÖRE STANDART EBATLAR
-        if kagit in ["Amerikan Bristol", "Krome Karton"]:
-            # Kartonlarda 70x100 altı standart tabaka YOKTUR.
-            adaylar.append(("70x100 cm (Standart)", 700.0, 1000.0, "70100", 15.0))
-        else:
-            # Kuşe ve Hamur için standartlar
-            adaylar.append(("70x100 cm (Standart)", 700.0, 1000.0, "70100", 15.0))
-            adaylar.append(("64x90 cm (Standart)", 640.0, 900.0, "70100", 15.0))
-            adaylar.append(("50x70 cm (Standart)", 500.0, 700.0, "5070", 12.0))
-            adaylar.append(("35x50 cm (Standart)", 350.0, 500.0, "3550", 10.0))
-            
-            # 57x82 ve 45x64 SADECE Kuşe/Hamur ve <= 170 gr/m2 ise mevcuttur
-            if gramaj <= 170:
-                adaylar.append(("57x82 cm (Standart)", 570.0, 820.0, "70100", 15.0))
-                adaylar.append(("45x64 cm (Standart)", 450.0, 640.0, "5070", 12.0))
+        # 3 Ana Satın Alma Ebadı ve Bölme Matrisi (Erhan Bey'in Tablo Kuralları)
+        # 70x100 Grubu
+        adaylar.append(("70x100 cm (Tam Tabaka)", 700.0, 1000.0, "70100", 15.0))
+        adaylar.append(("50x70 cm (2'ye Bölünmüş)", 500.0, 700.0, "5070", 12.0))
+        adaylar.append(("33.3x70 cm (3'e Bölünmüş)", 333.0, 700.0, "3550", 10.0))
+        adaylar.append(("35x65 cm (3'e Bölünmüş)", 350.0, 650.0, "5070", 12.0))
+        adaylar.append(("35x50 cm (4'e Bölünmüş)", 350.0, 500.0, "3550", 10.0))
+        adaylar.append(("23x50 cm (6'ya Bölünmüş)", 230.0, 500.0, "3550", 10.0))
+        adaylar.append(("25x45 cm (6'ya Bölünmüş)", 250.0, 450.0, "3550", 10.0))
+
+        # 64x90 Grubu
+        adaylar.append(("64x90 cm (Tam Tabaka)", 640.0, 900.0, "70100", 15.0))
+        adaylar.append(("45x64 cm (2'ye Bölünmüş)", 450.0, 640.0, "5070", 12.0))
+        adaylar.append(("30x64 cm (3'e Bölünmüş)", 300.0, 640.0, "5070", 12.0))
+        adaylar.append(("31x59 cm (3'e Bölünmüş)", 310.0, 590.0, "5070", 12.0))
+        adaylar.append(("32x45 cm (4'e Bölünmüş)", 320.0, 450.0, "3550", 10.0))
+        adaylar.append(("21.3x45 cm (6'ya Bölünmüş)", 213.0, 450.0, "3550", 10.0))
+        adaylar.append(("22.5x41.5 cm (6'ya Bölünmüş)", 225.0, 415.0, "3550", 10.0))
+
+        # 57x82 Grubu (Sadece Kuşe ve Hamur ve <=170gr ise)
+        if kagit in ["Kuşe Kağıt", "1. Hamur Kağıt"] and gramaj <= 170:
+            adaylar.append(("57x82 cm (Tam Tabaka)", 570.0, 820.0, "70100", 15.0))
+            adaylar.append(("41x57 cm (2'ye Bölünmüş)", 410.0, 570.0, "5070", 12.0))
+            adaylar.append(("27.3x57 cm (3'e Bölünmüş)", 273.0, 570.0, "5070", 12.0))
 
         # BOBİN KESİM (600 kg ve üzeri için 5'er cm katları)
-        for w in range(50, 75, 5):
-            for h in range(70, 105, 5):
-                ebat_adi = f"{w}x{h} cm (Özel Bobin Kesim)"
-                makine_k = "5070" if (w <= 50 and h <= 70) else "70100"
-                makas_p = 12.0 if makine_k == "5070" else 15.0
-                
-                if ebat_adi not in [a[0] for a in adaylar]:
-                    adaylar.append((ebat_adi, float(w*10), float(h*10), makine_k, makas_p))
+        for w in range(55, 75, 5):
+            for h in range(60, 105, 5):
+                if w <= 70 and h <= 100:
+                    ebat_adi = f"{w}x{h} cm (Özel Bobin Kesim)"
+                    makine_k = "5070" if (w <= 50 and h <= 70) else "70100"
+                    makas_p = 12.0 if makine_k == "5070" else 15.0
+                    
+                    if ebat_adi not in [a[0] for a in adaylar]:
+                        adaylar.append((ebat_adi, float(w*10), float(h*10), makine_k, makas_p))
 
         en_iyi_sonuc = None
         en_dusuk_toplam_maliyet = float('inf')
@@ -456,11 +472,9 @@ elif st.session_state.page == 'calc':
                 kagit_adi, makine_kodu, tw, th, makas, montaj, 0.0, ebat_en, ebat_boy, ebat_yukseklik
             )
 
-            # Özel Bobin kesimler 600 kg limitini sağlamıyorsa elenir
             if "Özel Bobin Kesim" in kagit_adi and res['kg_kagit'] < 600:
                 continue
 
-            # A, B ve C alternatifleri için makine ekonomik optimizasyonu
             maliyet_Puani = res['toplam_uretim_maliyeti']
             
             if maliyet_Puani < en_dusuk_toplam_maliyet:
@@ -603,8 +617,8 @@ elif st.session_state.page == 'calc':
             {"Parametre / Kriter": "Brüt Adet", "Değer": f"{r['brut_adet']:,} adet"},
             {"Parametre / Kriter": "Montaj Planı", "Değer": f"1 Tabakada {r['montaj_adedi']} Ürün ({urun_tipi})"},
             {"Parametre / Kriter": "Tabaka Ebadı ve Sayısı", "Değer": f"{p['ebat']} ({r['tabaka_adeti']:,} tabaka)"},
-            {"Parametre / Kriter": "Baskı Kalıp Sayısı", "Değer": f"{r['kalıp_sayisi']} Adet Kalıp"},
-            {"Parametre / Kriter": "Kullanılan Makine", "Değer": f"{r['makine_kodu']} Makinesi"},
+            {"Parametre / Kriter": "Baskı Ebadı ve Sayısı", "Değer": r['baski_kalip_metni']},
+            {"Parametre / Kriter": "Baskıya Girecek Kağıt Ebadı", "Değer": p['ebat']},
             {"Parametre / Kriter": "Kağıt Kilogram (kg)", "Değer": f"{r['kg_kagit']} kg"},
             {"Parametre / Kriter": "Baskı Adedi ve Geçiş Sayısı", "Değer": f"{r['tabaka_adeti']:,} tabaka x {r['gecis_sayisi']} geçiş"},
             {"Parametre / Kriter": "Baskı Metodu", "Değer": r['gercek_baski_yuzu']},
