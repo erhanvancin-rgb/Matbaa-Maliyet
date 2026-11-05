@@ -136,11 +136,11 @@ if st.session_state.page == 'home':
             st.rerun()
 
 # ==========================================
-# MENÜ 2: PARAMETRELER SAYFASI (KALICI JSON)
+# MENÜ 2: PARAMETRELER SAYFASI (KALICI JSON VE STATE KORUMALI)
 # ==========================================
 elif st.session_state.page == 'params':
     st.subheader("Matbaa Maliyet Parametreleri Fiyat Listesi (Excel 37 Parametre Tam Listesi)")
-    st.caption("Değiştirdiğiniz tüm fiyatlar otomatik olarak kalıcı dosyaya kaydedilir ve sıfırlanmaz.")
+    st.caption("Değiştirdiğiniz tüm fiyatlar otomatik olarak kalıcı dosyaya kaydedilir ve sayfa geçişlerinde sıfırlanmaz.")
     
     col1, col2 = st.columns(2)
     
@@ -317,36 +317,34 @@ elif st.session_state.page == 'calc':
 
     # --- KADEMELİ FIRE HESAPLAMA FONKSİYONU ---
     def kademeli_fire_hesapla(baski_tabaka_sayisi):
-        # İlk 1000 adet için sabit 100 tabaka
-        # 1000'den sonraki her 1000 adet için kademeli oranlar: %5, %4, %3, sonra %2
         kalan = baski_tabaka_sayisi
         fire = 0.0
         
-        # 0 - 1000 arası
+        # İlk 1000 adet için sabit 100 tabaka
         dilim_1 = min(kalan, 1000)
         if dilim_1 > 0:
-            fire += 100.0  # Sabit 100 tabaka
+            fire += 100.0  
             kalan -= dilim_1
             
-        # 1000 - 2000 arası (%5)
+        # Sonraki 1000 adet için %5
         if kalan > 0:
             dilim_2 = min(kalan, 1000)
             fire += dilim_2 * 0.05
             kalan -= dilim_2
             
-        # 2000 - 3000 arası (%4)
+        # Sonraki 1000 adet için %4
         if kalan > 0:
             dilim_3 = min(kalan, 1000)
             fire += dilim_3 * 0.04
             kalan -= dilim_3
             
-        # 3000 - 4000 arası (%3)
+        # Sonraki 1000 adet için %3
         if kalan > 0:
             dilim_4 = min(kalan, 1000)
             fire += dilim_4 * 0.03
             kalan -= dilim_4
             
-        # 4000 ve üzeri (%2)
+        # 10.000 adete ulaştıktan sonra / 4000 üzeri için %2
         if kalan > 0:
             fire += kalan * 0.02
             
@@ -387,10 +385,9 @@ elif st.session_state.page == 'calc':
             montaj = max(adet_1, adet_2)
             if montaj <= 0: continue
 
-            # Saf net baskı tabaka ihtiyacı (fire hariç)
             net_baski_tabaka = math.ceil(net_adet / montaj)
             
-            # Yeni Kademeli Fire Hesabı
+            # Kademeli Fire Hesabı
             fire_tabaka = kademeli_fire_hesapla(net_baski_tabaka)
             brut_baski_tabaka = net_baski_tabaka + fire_tabaka
             if brut_baski_tabaka < 100: brut_baski_tabaka = 100
@@ -405,7 +402,7 @@ elif st.session_state.page == 'calc':
             toplam_m2 = round(tabaka_adeti * tab_en * tab_boy, 2)
             kg_kagit = round((toplam_m2 * gramaj) / 1000.0, 2)
 
-            # Karton grubu < 600 kg kuralı filtresi
+            # Karton grubu < 600 kg kuralı filtresi (< 600 kg ise sadece 70x100 ailesi)
             if is_karton and kg_kagit < 600.0:
                 if "70x100" not in ana_tabaka:
                     continue
@@ -423,7 +420,6 @@ elif st.session_state.page == 'calc':
             baski_maliyeti = b_cmyk + (fazla_vurus / 1000.0) * b_tiraj
             toplam_maliyet = kagit_maliyeti + baski_maliyeti + 400.0
 
-            # Gerçekleşen brüt ürün adedi (baskı tabaka * montaj)
             brut_adet = baskiya_giren_tabaka_adeti * montaj
             fire_pct_ortalama = round((fire_tabaka / max(1, net_baski_tabaka)) * 100.0, 1)
 
@@ -685,7 +681,7 @@ elif st.session_state.page == 'teklif':
                 "Net Adet": f"{net_adet:,} adet",
                 "Kağıt Özelliği": f"{alt['gramaj']} gr {alt['kagit']}",
                 "Ana Tabaka": res['ana_ebat'],
-                "Kağıt Ağırlığı": f"{res['kg_kagit']} kg",
+                "Kağıt Ağırlığı": res['kg_kagit'],
                 "Birim Satış Fiyatı (TL)": f"₺{birim_satis_tl:,.4f}",
                 "Karlı Toplam Tutar (TL)": f"₺{toplam_satis_tl:,.2f}"
             })
