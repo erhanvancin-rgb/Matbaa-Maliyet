@@ -5,6 +5,7 @@ import math
 import pandas as pd
 import json
 import os
+from optimization import best_box_montage, bobin_cutting_allowed, box_blank_size, rectangular_imposition, recommend, Rect
 
 st.set_page_config(page_title="Matbaa ve Ambalaj Maliyet & Teklif Sistemi", layout="wide")
 
@@ -171,6 +172,7 @@ elif st.session_state.page == 'calc':
         urun_tipi = st.selectbox("Ürün Tipi", urun_tipleri)
 
     is_kutu = "Kutu" in urun_tipi
+    is_dip_kilit = urun_tipi in ["Dip Kilitli Kutu", "Dip Kilit Yapıştırmalı Kutu"]
 
     col_r2_1, col_r2_2, col_r2_3 = st.columns(3)
     with col_r2_1: net_a = st.number_input("Ürün Adedi A", value=1000, step=100)
@@ -194,6 +196,10 @@ elif st.session_state.page == 'calc':
     with col_ebat1: ebat_en = st.number_input("En (mm) [A]", value=100)
     with col_ebat2: ebat_boy = st.number_input("Boy (mm) [B]", value=150)
     with col_ebat3: ebat_yukseklik = st.number_input("Yükseklik (mm) [C]", value=50.0 if is_kutu else 0.0, disabled=not is_kutu)
+    if is_dip_kilit:
+        sira_sayisi = st.selectbox("Dip kilit ürün sıra sayısı", list(range(1, 13)), index=0)
+    else:
+        sira_sayisi = 1
     with col_baski1: cmyk_secim = st.selectbox("Baskı CMYK", ["Tek Yüz", "Ön&Arka", "CMYK Baskı yok"])
     with col_baski2: pantone_secimi = st.selectbox("Baskı Pantone renk", ["Yok", "1 renk zemin", "2 renk zemin", "1 renk lokal"])
 
@@ -230,27 +236,24 @@ elif st.session_state.page == 'calc':
         elif machine_code == "5070": return 12.0
         else: return 10.0
 
-    # NİHAİ ÇÖZÜM: MASTER MATBAA VERİMLİLİK ÇARPANI (INTERLOCK MANTIĞI)
+    # Dikdörtgen yerleşim tahminidir; gerçek bıçak çizimi ayrıca doğrulanmalıdır.
     def akilli_montaj_hesapla(w_avail, h_avail, ebat_en, ebat_boy, ebat_yuk):
         if not is_kutu:
             w_net = ebat_en + 3.0
             h_net = ebat_boy + 3.0
-            return max(int(w_avail // w_net) * int(h_avail // h_net), int(w_avail // h_net) * int(h_avail // w_net))
-        
-        # Düz Bounding Box Alan İhtiyacı (Bıçak ve Makas paylarıyla)
-        w_net = (ebat_en * 2) + (ebat_yuk * 2) + 15.0
-        h_net = ebat_boy + (ebat_yuk * 2) + 30.0
-        
-        m1 = int(w_avail // w_net) * int(h_avail // h_net)
-        m2 = int(w_avail // h_net) * int(h_avail // w_net)
-        base_montaj = max(m1, m2)
-        
-        # MATBAA USTASI KURALI: 
-        # Sizin tecrübenize göre 33,3x35 (1 ürün), 33,3x70 (2 ürün) ve 60x100 (8 ürün) çıkıyor.
-        # Bu verimi pürüzsüz yakalayan altın oran çarpanı (1.334) ters-düz kapak kilitlenmesini simüle eder.
-        if base_montaj > 0:
-            return int(base_montaj * 1.334)
-        return base_montaj
+            blank = Rect(w_net, h_net)
+            return {"count": rectangular_imposition(Rect(w_avail, h_avail), blank),
+                    "rows": 1, "columns": 1, "blank": blank}
+
+        kutu_tipi = "dip_kilit" if is_dip_kilit and urun_tipi == "Dip Kilitli Kutu" else (
+            "dip_yapistirmali" if is_dip_kilit else "standard"
+        )
+        if kutu_tipi == "standard":
+            return best_box_montage(Rect(w_avail, h_avail), ebat_en, ebat_boy, ebat_yuk)
+        blank = box_blank_size(ebat_en, ebat_boy, ebat_yuk, kutu_tipi, sira_sayisi)
+        grid_count = rectangular_imposition(Rect(w_avail, h_avail), blank)
+        return {"count": grid_count * sira_sayisi, "rows": sira_sayisi,
+                "columns": 1, "blank": blank}
 
     # BOBİN HASSASİYETİ (84-96 CM ENGELLENDİ, SADECE 5 CM KATLARI)
     def bobin_adaylarini_uret():
@@ -295,6 +298,7 @@ elif st.session_state.page == 'calc':
 
         en_iyi_secim = None
         min_maliyet = float('inf')
+        aday_sonuclari = []
 
         def adaylari_degerlendir(aday_listesi):
             nonlocal en_iyi_secim, min_maliyet
@@ -303,8 +307,11 @@ elif st.session_state.page == 'calc':
                 avail_w = tw - makas
                 avail_h = th
                 
-                montaj = akilli_montaj_hesapla(avail_w, avail_h, ebat_en, ebat_boy, ebat_yukseklik)
+                montaj_plan = akilli_montaj_hesapla(avail_w, avail_h, ebat_en, ebat_boy, ebat_yukseklik)
+                montaj = montaj_plan["count"]
                 if montaj <= 0: continue
+                blank = montaj_plan["blank"]
+                montaj_detay = f"{montaj_plan['columns']} sütun × {montaj_plan['rows']} sıra; modül {blank.width_mm:g}×{blank.height_mm:g} mm"
 
                 net_baski_tabaka = math.ceil(net_adet / montaj)
                 fire_tabaka = kademeli_fire_hesapla(net_baski_tabaka)
@@ -335,7 +342,17 @@ elif st.session_state.page == 'calc':
                 
                 # YAPAY CEZA (verim_orani) TAMAMEN KALDIRILDI! 
                 # Pür matematik maliyeti karar verecek.
-                toplam_maliyet = kagit_maliyeti + baski_maliyeti + 400.0 
+                # Kesim ve sonraki işlemlerin seçili makine tarifesi henüz modele bağlı değil.
+                # 400 TL sabit tahminini kaldırıp eksik girdiyi sonuçta açıkça gösteriyoruz.
+                toplam_maliyet = kagit_maliyeti + baski_maliyeti
+                aday_sonuclari.append({
+                    "ana_ebat": ana_tabaka, "baski_ebat_str": baski_ebat_adi,
+                    "montaj_adedi": montaj, "kg": kg_kagit,
+                    "kagit_maliyeti": kagit_maliyeti, "baski_maliyeti": baski_maliyeti,
+                    "total_cost": toplam_maliyet, "makine_kodu": makine_kodu,
+                    "tabaka_adeti": tabaka_adeti,
+                    "montaj_detay": montaj_detay,
+                })
                 
                 brut_adet = baskiya_giren_tabaka_adeti * montaj
                 fire_pct_ortalama = round((fire_tabaka / max(1, net_baski_tabaka)) * 100.0, 1)
@@ -344,10 +361,11 @@ elif st.session_state.page == 'calc':
                     min_maliyet = toplam_maliyet
                     en_iyi_secim = {
                         "brut_adet": brut_adet, "fire_pct": fire_pct_ortalama, "fire_tabaka": fire_tabaka,
-                        "montaj_adedi": montaj, "tabaka_adeti": tabaka_adeti, "baskiya_giren_tabaka": baskiya_giren_tabaka_adeti,
+                        "montaj_adedi": montaj, "montaj_detay": montaj_detay, "tabaka_adeti": tabaka_adeti, "baskiya_giren_tabaka": baskiya_giren_tabaka_adeti,
                         "ana_ebat": ana_tabaka, "baski_ebat_str": baski_ebat_adi, "toplam_m2": toplam_m2,
                         "kg_kagit": kg_kagit, "kagit_maliyeti": kagit_maliyeti, "baski_maliyeti": baski_maliyeti,
-                        "toplam_uretim_maliyeti": toplam_maliyet, "makine_kodu": makine_kodu
+                        "toplam_uretim_maliyeti": toplam_maliyet, "makine_kodu": makine_kodu,
+                        "kesim_maliyeti_dahil": False, "geometri_dogrulama_gerekli": is_kutu
                     }
                 # Maliyet eşitliğinde kağıdı (m2/kg) az harcayanı seç
                 elif abs(toplam_maliyet - min_maliyet) < 1.0:
@@ -355,26 +373,25 @@ elif st.session_state.page == 'calc':
                         min_maliyet = toplam_maliyet
                         en_iyi_secim = {
                             "brut_adet": brut_adet, "fire_pct": fire_pct_ortalama, "fire_tabaka": fire_tabaka,
-                            "montaj_adedi": montaj, "tabaka_adeti": tabaka_adeti, "baskiya_giren_tabaka": baskiya_giren_tabaka_adeti,
+                            "montaj_adedi": montaj, "montaj_detay": montaj_detay, "tabaka_adeti": tabaka_adeti, "baskiya_giren_tabaka": baskiya_giren_tabaka_adeti,
                             "ana_ebat": ana_tabaka, "baski_ebat_str": baski_ebat_adi, "toplam_m2": toplam_m2,
                             "kg_kagit": kg_kagit, "kagit_maliyeti": kagit_maliyeti, "baski_maliyeti": baski_maliyeti,
-                            "toplam_uretim_maliyeti": toplam_maliyet, "makine_kodu": makine_kodu
+                            "toplam_uretim_maliyeti": toplam_maliyet, "makine_kodu": makine_kodu,
+                            "kesim_maliyeti_dahil": False, "geometri_dogrulama_gerekli": is_kutu
                         }
 
         adaylari_degerlendir(standart_adaylar)
 
         geici_kg = en_iyi_secim['kg_kagit'] if en_iyi_secim else 0.0
-        if is_karton and geici_kg >= 600.0:
+        if bobin_cutting_allowed(kagit, geici_kg):
             dinamik_bobinler = bobin_adaylarini_uret()
             adaylari_degerlendir(dinamik_bobinler)
 
         if en_iyi_secim is None:
-            en_iyi_secim = {
-                "brut_adet": net_adet, "fire_pct": 5.0, "fire_tabaka": 100, "montaj_adedi": 1, "tabaka_adeti": net_adet,
-                "baskiya_giren_tabaka": net_adet, "ana_ebat": "70x100 cm", "baski_ebat_str": "70x100 cm",
-                "toplam_m2": 100.0, "kg_kagit": 50.0, "kagit_maliyeti": 1000.0, "baski_maliyeti": 1000.0,
-                "toplam_uretim_maliyeti": 2500.0, "makine_kodu": "70100"
-            }
+            raise ValueError("Bu ebat ve makine sınırlarıyla uygun üretim planı bulunamadı.")
+
+        oneri = recommend(aday_sonuclari)
+        en_iyi_secim["oneriler"] = oneri
 
         return en_iyi_secim
 
@@ -403,13 +420,15 @@ elif st.session_state.page == 'calc':
     st.session_state.teklif_data = {
         "firma_adi": firma_adi, "urun_adi": urun_adi, "urun_tipi": urun_tipi,
         "ebat_en": ebat_en, "ebat_boy": ebat_boy, "ebat_yukseklik": ebat_yukseklik,
+        "sira_sayisi": sira_sayisi,
         "cmyk_secim": cmyk_secim, "pantone_secimi": pantone_secimi,
         "laminasyon": laminasyon, "baski_sonrasi": baski_sonrasi,
         "ozel_baski": ozel_baski_ozet, "ozel_istekler": ozel_istekler,
         "kar_orani": kar_orani, "alternatifler": teklif_alternatifleri
     }
 
-    st.markdown("### 📊 ÜRETİM VE PLANLAMA ÖZETİ (NİHAİ MATBAA MATEMATİĞİ)")
+    st.markdown("### 📊 ÜRETİM VE PLANLAMA ÖZETİ")
+    st.warning("Montaj, verilen kutu açınımı formüllerinin dikdörtgen yerleşim tahminidir; gerçek ölçü ve bıçak çizimiyle doğrulayın. Amerikan Bristol ve Krome Karton'da 600 kg'a kadar 70×100 ana tabaka kullanılır; üzerindeki miktarlarda bobin kesim adayları da değerlendirilir. Gösterilen maliyet kâğıt ve baskıyı kapsar; kesim/selofan/diğer işlem tarifeleri bu plan hesabına henüz bağlı değildir.")
 
     def plan_kartini_yazdir(p):
         r = p['res']
@@ -468,7 +487,7 @@ elif st.session_state.page == 'calc':
         plan_df = pd.DataFrame([
             {"Parametre / Kriter": "Fire Tabaka / Oranı", "Değer": f"{r['fire_tabaka']} Tabaka (Ort. %{r['fire_pct']})"},
             {"Parametre / Kriter": "Brüt Ürün Adedi", "Değer": f"{r['brut_adet']:,} adet"},
-            {"Parametre / Kriter": "Montaj Planı", "Değer": f"1 Tabakada {r['montaj_adedi']} Ürün ({urun_tipi})"},
+            {"Parametre / Kriter": "Montaj Planı", "Değer": f"1 Tabakada {r['montaj_adedi']} Ürün; {r.get('montaj_detay', 'Dikdörtgen yerleşim')} ({urun_tipi})"},
             {"Parametre / Kriter": "Ana Tabaka Ebadı ve Sayısı", "Değer": f"{r['ana_ebat']} {r['tabaka_adeti']:,} Tabaka".replace(',', '.')},
             {"Parametre / Kriter": "Baskı Ebadı ve Sayısı", "Değer": baski_ebat_detay},
             {"Parametre / Kriter": "Baskıya Girecek Kağıt Ebadı ve Sayısı", "Değer": f"{r['baski_ebat_str']} {ham_tabaka:,} Tabaka".replace(',', '.')},
@@ -478,6 +497,19 @@ elif st.session_state.page == 'calc':
             {"Parametre / Kriter": "Kaç M2", "Değer": f"{r['toplam_m2']:,.2f} m²"}
         ])
         st.table(plan_df)
+        oneriler = r.get("oneriler", {})
+        oneriler_df = pd.DataFrame([
+            {"Plan": etiket, "Tabaka": secim["ana_ebat"], "Baskı ebatı": secim["baski_ebat_str"],
+             "Montaj modülü": secim["montaj_detay"],
+             "Montaj": secim["montaj_adedi"], "Kâğıt (kg)": round(secim["kg"], 2),
+             "Kâğıt + baskı (₺)": round(secim["total_cost"], 2)}
+            for etiket, secim in [("En düşük kâğıt + baskı", oneriler.get("lowest_total_cost")),
+                                  ("En az kâğıt", oneriler.get("lowest_paper_use")),
+                                  ("Dengeli", oneriler.get("balanced"))]
+            if secim is not None
+        ])
+        st.caption("Aşağıdaki sıralama mevcut kâğıt ve baskı girdileriyle yapılır; kesim ve sonraki işlem tarifeleri eksik olduğu için gerçek toplam maliyeti göstermez.")
+        st.dataframe(oneriler_df, use_container_width=True, hide_index=True)
 
     if ikinci_kagit_var:
         st.markdown("#### 🔹 Kağıt A Alternatifleri")
@@ -516,6 +548,7 @@ elif st.session_state.page == 'teklif':
     else:
         td = st.session_state.teklif_data
         kar_orani = td['kar_orani']
+        st.warning("Bu ekrandaki hesap kâğıt ve baskı maliyetine dayanır. Kesim, selofan ve diğer operasyon tarifeleri hesaba bağlanmadığından müşteriye gönderilecek nihai teklif olarak kullanılmadan önce bu kalemleri ekleyin.")
 
         st.markdown(
             "<div style='background-color: #f8f9fa; padding: 20px; border-radius: 10px; border-left: 5px solid #1F4E78;'>"
@@ -530,6 +563,8 @@ elif st.session_state.page == 'teklif':
         col_t1, col_t2, col_t3 = st.columns(3)
         with col_t1:
             st.write(f"**Ürün Adı:** {td['urun_adi']}"); st.write(f"**Ürün Tipi:** {td['urun_tipi']}"); st.write(f"**Ebat:** {td['ebat_en']}x{td['ebat_boy']}x{td['ebat_yukseklik']} mm")
+            if td['urun_tipi'] in ["Dip Kilitli Kutu", "Dip Kilit Yapıştırmalı Kutu"]:
+                st.write(f"**Dip kilit sıra sayısı:** {td['sira_sayisi']}")
         with col_t2:
             st.write(f"**Baskı CMYK:** {td['cmyk_secim']}"); st.write(f"**Pantone Renk:** {td['pantone_secimi']}"); st.write(f"**Yüzey Kaplama:** {td['laminasyon']}")
         with col_t3:
