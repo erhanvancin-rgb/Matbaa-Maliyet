@@ -14,7 +14,7 @@ helper_names = {"Rect", "Machine", "box_blank_size", "best_box_montage",
                 "bobin_cutting_allowed", "rectangular_imposition", "score_candidate", "recommend",
                 "estimate_knife_cost", "tiered_operation_cost", "press_cost_from_params",
                 "cutting_operation_cost", "layout_process_costs", "sheet_fits_limits",
-                "automatic_postpress_for_product"}
+                "automatic_postpress_for_product", "included_quantity_operation_cost"}
 helper_nodes = [node for node in app_tree.body
                 if getattr(node, "name", None) in helper_names]
 helper_namespace = {"__name__": "matbaa_helpers", "dataclass": dataclass,
@@ -31,6 +31,7 @@ score_candidate = helper_namespace["score_candidate"]
 estimate_knife_cost = helper_namespace["estimate_knife_cost"]
 tiered_operation_cost = helper_namespace["tiered_operation_cost"]
 cutting_operation_cost = helper_namespace["cutting_operation_cost"]
+included_quantity_operation_cost = helper_namespace["included_quantity_operation_cost"]
 press_cost_from_params = helper_namespace["press_cost_from_params"]
 layout_process_costs = helper_namespace["layout_process_costs"]
 sheet_fits_limits = helper_namespace["sheet_fits_limits"]
@@ -76,7 +77,41 @@ class OptimizationTests(unittest.TestCase):
                 total_area_m2=1.0,
             )
             glue_costs.append(costs["Yapıştırma"])
-        self.assertEqual(glue_costs, [3000, 3000])
+        self.assertEqual(glue_costs, [2000, 2000])
+
+    def test_gluing_setup_includes_first_10000_units(self):
+        self.assertEqual(included_quantity_operation_cost(5000, 10000, 2000, 0.2), 2000)
+        self.assertEqual(included_quantity_operation_cost(10000, 10000, 2000, 0.2), 2000)
+        self.assertEqual(included_quantity_operation_cost(15000, 10000, 2000, 0.2), 3000)
+        self.assertEqual(included_quantity_operation_cost(15000, 10000, 2500, 0.25), 3750)
+
+    def test_dip_glued_box_adds_dip_tariff_only_above_included_quantity(self):
+        params = {
+            "b_3550_cmyk": 1800, "b_3550_pantone": 900, "b_3550_tiraj": 400,
+            "kazanli": 1800, "kazanli_tiraj": 0.75,
+            "bicak_metre_fiyati": 500,
+            "omega_tek": 2000, "omega_tek_tiraj": 0.2,
+            "omega_dip": 2500, "omega_dip_tiraj": 0.25,
+        }
+        costs = layout_process_costs(
+            params=params,
+            press_code="3550",
+            sheet_quantity=1000,
+            order_quantity=15000,
+            cutting_machine="Kazanlı Kesim",
+            cmyk_enabled=True,
+            pantone_colors=0,
+            lamination="Yok",
+            special_finishes=[],
+            product_width_mm=100,
+            product_length_mm=150,
+            is_box=True,
+            is_dip_glued=True,
+            special_cut=False,
+            postpress=automatic_postpress_for_product("Dip Kilit Yapıştırmalı Kutu"),
+            total_area_m2=1.0,
+        )
+        self.assertEqual(costs["Yapıştırma"], 6750)
 
     def test_grid_yield_checks_both_orientations_without_multiplier(self):
         self.assertEqual(rectangular_imposition(Rect(700, 1000), Rect(333, 350)), 4)
