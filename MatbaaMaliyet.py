@@ -5,7 +5,7 @@ import math
 import pandas as pd
 import json
 import os
-from optimization import rectangular_imposition, recommend, Rect
+from optimization import bobin_cutting_allowed, box_blank_size, rectangular_imposition, recommend, Rect
 
 st.set_page_config(page_title="Matbaa ve Ambalaj Maliyet & Teklif Sistemi", layout="wide")
 
@@ -172,6 +172,7 @@ elif st.session_state.page == 'calc':
         urun_tipi = st.selectbox("Ürün Tipi", urun_tipleri)
 
     is_kutu = "Kutu" in urun_tipi
+    is_dip_kilit = urun_tipi in ["Dip Kilitli Kutu", "Dip Kilit Yapıştırmalı Kutu"]
 
     col_r2_1, col_r2_2, col_r2_3 = st.columns(3)
     with col_r2_1: net_a = st.number_input("Ürün Adedi A", value=1000, step=100)
@@ -195,6 +196,10 @@ elif st.session_state.page == 'calc':
     with col_ebat1: ebat_en = st.number_input("En (mm) [A]", value=100)
     with col_ebat2: ebat_boy = st.number_input("Boy (mm) [B]", value=150)
     with col_ebat3: ebat_yukseklik = st.number_input("Yükseklik (mm) [C]", value=50.0 if is_kutu else 0.0, disabled=not is_kutu)
+    if is_dip_kilit:
+        sira_sayisi = st.selectbox("Dip kilit ürün sıra sayısı", list(range(1, 13)), index=0)
+    else:
+        sira_sayisi = 1
     with col_baski1: cmyk_secim = st.selectbox("Baskı CMYK", ["Tek Yüz", "Ön&Arka", "CMYK Baskı yok"])
     with col_baski2: pantone_secimi = st.selectbox("Baskı Pantone renk", ["Yok", "1 renk zemin", "2 renk zemin", "1 renk lokal"])
 
@@ -237,13 +242,13 @@ elif st.session_state.page == 'calc':
             w_net = ebat_en + 3.0
             h_net = ebat_boy + 3.0
             return rectangular_imposition(Rect(w_avail, h_avail), Rect(w_net, h_net))
-        
-        # Düz Bounding Box Alan İhtiyacı (Bıçak ve Makas paylarıyla)
-        w_net = (ebat_en * 2) + (ebat_yuk * 2) + 15.0
-        h_net = ebat_boy + (ebat_yuk * 2) + 30.0
-        
-        # Açınımın bounding box'ı üzerinden ızgara hesabı; bıçak yerleşimini kanıtlamaz.
-        return rectangular_imposition(Rect(w_avail, h_avail), Rect(w_net, h_net))
+
+        kutu_tipi = "dip_kilit" if is_dip_kilit and urun_tipi == "Dip Kilitli Kutu" else (
+            "dip_yapistirmali" if is_dip_kilit else "standard"
+        )
+        blank = box_blank_size(ebat_en, ebat_boy, ebat_yuk, kutu_tipi, sira_sayisi)
+        grid_count = rectangular_imposition(Rect(w_avail, h_avail), blank)
+        return grid_count * sira_sayisi if is_dip_kilit else grid_count
 
     # BOBİN HASSASİYETİ (84-96 CM ENGELLENDİ, SADECE 5 CM KATLARI)
     def bobin_adaylarini_uret():
@@ -369,7 +374,7 @@ elif st.session_state.page == 'calc':
         adaylari_degerlendir(standart_adaylar)
 
         geici_kg = en_iyi_secim['kg_kagit'] if en_iyi_secim else 0.0
-        if is_karton and geici_kg >= 600.0:
+        if bobin_cutting_allowed(kagit, geici_kg):
             dinamik_bobinler = bobin_adaylarini_uret()
             adaylari_degerlendir(dinamik_bobinler)
 
@@ -406,6 +411,7 @@ elif st.session_state.page == 'calc':
     st.session_state.teklif_data = {
         "firma_adi": firma_adi, "urun_adi": urun_adi, "urun_tipi": urun_tipi,
         "ebat_en": ebat_en, "ebat_boy": ebat_boy, "ebat_yukseklik": ebat_yukseklik,
+        "sira_sayisi": sira_sayisi,
         "cmyk_secim": cmyk_secim, "pantone_secimi": pantone_secimi,
         "laminasyon": laminasyon, "baski_sonrasi": baski_sonrasi,
         "ozel_baski": ozel_baski_ozet, "ozel_istekler": ozel_istekler,
@@ -413,7 +419,7 @@ elif st.session_state.page == 'calc':
     }
 
     st.markdown("### 📊 ÜRETİM VE PLANLAMA ÖZETİ")
-    st.warning("Montaj, düz dikdörtgen yerleşim varsayımıdır; özellikle kutu işlerinde gerçek ölçü ve bıçak çizimiyle doğrulayın. Gösterilen maliyet kâğıt ve baskıyı kapsar; kesim/selofan/diğer işlem tarifeleri bu plan hesabına henüz bağlı değildir. Bu nedenle toplam üretim maliyeti kesin teklif toplamı değildir.")
+    st.warning("Montaj, verilen kutu açınımı formüllerinin dikdörtgen yerleşim tahminidir; gerçek ölçü ve bıçak çizimiyle doğrulayın. Amerikan Bristol ve Krome Karton'da 600 kg'a kadar 70×100 ana tabaka kullanılır; üzerindeki miktarlarda bobin kesim adayları da değerlendirilir. Gösterilen maliyet kâğıt ve baskıyı kapsar; kesim/selofan/diğer işlem tarifeleri bu plan hesabına henüz bağlı değildir.")
 
     def plan_kartini_yazdir(p):
         r = p['res']
@@ -547,6 +553,8 @@ elif st.session_state.page == 'teklif':
         col_t1, col_t2, col_t3 = st.columns(3)
         with col_t1:
             st.write(f"**Ürün Adı:** {td['urun_adi']}"); st.write(f"**Ürün Tipi:** {td['urun_tipi']}"); st.write(f"**Ebat:** {td['ebat_en']}x{td['ebat_boy']}x{td['ebat_yukseklik']} mm")
+            if td['urun_tipi'] in ["Dip Kilitli Kutu", "Dip Kilit Yapıştırmalı Kutu"]:
+                st.write(f"**Dip kilit sıra sayısı:** {td['sira_sayisi']}")
         with col_t2:
             st.write(f"**Baskı CMYK:** {td['cmyk_secim']}"); st.write(f"**Pantone Renk:** {td['pantone_secimi']}"); st.write(f"**Yüzey Kaplama:** {td['laminasyon']}")
         with col_t3:

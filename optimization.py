@@ -29,6 +29,28 @@ class Machine:
                 or (sheet.height_mm <= self.max_width_mm and sheet.width_mm <= self.max_height_mm))
 
 
+def box_blank_size(width_mm: float, length_mm: float, height_mm: float,
+                   style: str = "standard", row_count: int = 1) -> Rect:
+    """Return the user's supplied box blank bounds; die-line still needs validation."""
+    if min(width_mm, length_mm) <= 0 or height_mm < 0 or row_count < 1:
+        raise ValueError("Ürün ölçüleri pozitif, sıra sayısı en az 1 olmalıdır.")
+    blank_width = width_mm * 2 + height_mm * 2 + 15
+    if style == "standard":
+        blank_height = length_mm + height_mm * 2 + 30
+    elif style in {"dip_kilit", "dip_yapistirmali"}:
+        blank_height = (length_mm + height_mm + 15 + (height_mm / 2 + 15) * 2) * row_count
+        if row_count in {1, 3, 5, 6, 7, 9, 10, 11}:
+            blank_height += height_mm + 15
+    else:
+        raise ValueError("Bilinmeyen kutu tipi.")
+    return Rect(blank_width, blank_height)
+
+
+def bobin_cutting_allowed(paper_name: str, paper_kg: float) -> bool:
+    """Bristol/Krome stay on 70x100 through 600 kg; bobin is considered above it."""
+    return paper_name in {"Amerikan Bristol", "Krome Karton"} and paper_kg > 600.0
+
+
 def rectangular_imposition(sheet: Rect, product: Rect, gap_mm: float = 3.0) -> int:
     """Max grid yield for either orientation; no hidden efficiency multiplier."""
     if min(sheet.width_mm, sheet.height_mm, product.width_mm, product.height_mm) <= 0:

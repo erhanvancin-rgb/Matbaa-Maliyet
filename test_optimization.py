@@ -1,11 +1,26 @@
 import unittest
 
-from optimization import Machine, Rect, rectangular_imposition, recommend, score_candidate
+from optimization import Machine, Rect, bobin_cutting_allowed, box_blank_size, rectangular_imposition, recommend, score_candidate
 
 
 class OptimizationTests(unittest.TestCase):
     def test_grid_yield_checks_both_orientations_without_multiplier(self):
         self.assertEqual(rectangular_imposition(Rect(700, 1000), Rect(333, 350)), 4)
+
+    def test_standard_box_keeps_existing_blank_formula(self):
+        self.assertEqual(box_blank_size(100, 150, 50), Rect(315, 280))
+
+    def test_dip_lock_even_rows_use_base_formula_times_rows(self):
+        self.assertEqual(box_blank_size(100, 150, 50, "dip_kilit", 2), Rect(315, 590))
+
+    def test_dip_lock_odd_rows_add_end_flap_allowance(self):
+        self.assertEqual(box_blank_size(100, 150, 50, "dip_yapistirmali", 3), Rect(315, 950))
+
+    def test_bobin_cutting_starts_only_above_600_kg_for_bristol_and_krome(self):
+        self.assertFalse(bobin_cutting_allowed("Amerikan Bristol", 600))
+        self.assertFalse(bobin_cutting_allowed("Krome Karton", 600))
+        self.assertTrue(bobin_cutting_allowed("Krome Karton", 600.01))
+        self.assertFalse(bobin_cutting_allowed("Kuşe Kağıt", 800))
 
     def test_press_capacity_rejects_oversize(self):
         press = Machine("35x50", 500, 350, 100, 10)
