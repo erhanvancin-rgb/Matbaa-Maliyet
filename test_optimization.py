@@ -93,13 +93,13 @@ class OptimizationTests(unittest.TestCase):
     def test_tiered_operation_cost_adds_each_setup_tier_and_run(self):
         self.assertEqual(tiered_operation_cost(1500, 1000, 1800, 0.75), 4725)
 
-    def test_press_cost_includes_selected_pantone_units_and_omits_disabled_cmyk(self):
+    def test_press_tirage_is_priced_per_1000_finished_products(self):
         params = {
             "b_3550_cmyk": 1800,
             "b_3550_pantone": 900,
             "b_3550_tiraj": 400,
         }
-        self.assertEqual(press_cost_from_params(params, "3550", 3000, True, 2), 4800)
+        self.assertEqual(press_cost_from_params(params, "3550", 1500, True, 2), 4200)
         self.assertEqual(press_cost_from_params(params, "3550", 3000, False, 0), 0)
 
 
