@@ -286,6 +286,106 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
+st.markdown(
+    """
+    <style>
+    :root {
+        --ink: #172b4d;
+        --muted: #64748b;
+        --paper: #f5f7fb;
+        --line: #e2e8f0;
+        --accent: #0f766e;
+    }
+    [data-testid="stAppViewContainer"] { background: var(--paper); }
+    [data-testid="stHeader"] { background: rgba(245, 247, 251, .92); }
+    [data-testid="stMainBlockContainer"] {
+        max-width: 1500px;
+        padding-top: 1.6rem;
+        padding-bottom: 3rem;
+    }
+    h1, h2, h3, h4 { color: var(--ink); letter-spacing: -.02em; }
+    [data-testid="stMarkdownContainer"] p { color: #334155; }
+    [data-testid="stTextInput"] input,
+    [data-testid="stNumberInput"] input,
+    [data-testid="stTextArea"] textarea {
+        border-radius: 10px;
+        border-color: #cbd5e1;
+        background: #fff;
+    }
+    [data-testid="stSelectbox"] [data-baseweb="select"] > div {
+        border-radius: 10px;
+        border-color: #cbd5e1;
+    }
+    [data-testid="stButton"] > button,
+    [data-testid="stDownloadButton"] > button {
+        border-radius: 10px;
+        font-weight: 650;
+        min-height: 2.8rem;
+        transition: transform .15s ease, box-shadow .15s ease;
+    }
+    [data-testid="stButton"] > button:hover,
+    [data-testid="stDownloadButton"] > button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 5px 14px rgba(23, 43, 77, .12);
+    }
+    [data-testid="stButton"] > button[kind="primary"] {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #fff;
+    }
+    [data-testid="stAlert"] { border-radius: 12px; }
+    [data-testid="stVerticalBlockBorderWrapper"] {
+        border-color: var(--line);
+        border-radius: 16px;
+        background: #fff;
+        box-shadow: 0 4px 16px rgba(23, 43, 77, .045);
+    }
+    [data-testid="stDataFrame"], [data-testid="stTable"] {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        overflow: hidden;
+        background: #fff;
+    }
+    .app-hero {
+        padding: 1.35rem 1.6rem;
+        margin-bottom: 1.1rem;
+        border: 1px solid #dbe5ef;
+        border-radius: 18px;
+        background: linear-gradient(120deg, #fff 5%, #eaf4f3 100%);
+        box-shadow: 0 8px 24px rgba(23, 43, 77, .06);
+    }
+    .app-hero-kicker {
+        color: var(--accent);
+        font-size: .75rem;
+        font-weight: 750;
+        letter-spacing: .12em;
+        text-transform: uppercase;
+    }
+    .app-hero-title {
+        color: var(--ink);
+        font-size: clamp(1.55rem, 3vw, 2.1rem);
+        font-weight: 760;
+        line-height: 1.2;
+        margin: .3rem 0;
+    }
+    .app-hero-subtitle { color: var(--muted); font-size: .98rem; }
+    .section-kicker {
+        color: var(--accent);
+        font-size: .73rem;
+        font-weight: 750;
+        letter-spacing: .1em;
+        text-transform: uppercase;
+        margin-bottom: .15rem;
+    }
+    @media (max-width: 700px) {
+        [data-testid="stMainBlockContainer"] { padding: 1rem .8rem 2rem; }
+        .app-hero { padding: 1.1rem; }
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 # --- 0. KALICI JSON PARAMETRE YÖNETİMİ VE STATE SENKRONİZASYONU ---
 PARAM_FILE = "matbaa_parametreleri.json"
 
@@ -414,7 +514,16 @@ def go_page(page_name):
 
 
 # --- 3. ÜST GEZİNTİ VE NAVİGASYON BARI ---
-st.markdown("## 🖨️ MATBAAM PRO - Ambalaj & Matbaa Maliyet ve Teklif Sistemi")
+st.markdown(
+    """
+    <div class="app-hero">
+      <div class="app-hero-kicker">MATBAAM PRO · ÜRETİM VE FİYATLANDIRMA</div>
+      <div class="app-hero-title">Matbaa maliyet ve teklif yönetimi</div>
+      <div class="app-hero-subtitle">Üretim planını oluşturun, maliyetleri karşılaştırın ve teklifinizi hazırlayın.</div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 if canli_usd is not None and canli_eur is not None:
     st.info(
         f"🏦 TCMB güncel döviz satış kurları — USD: ₺{canli_usd:.4f} | EUR: ₺{canli_eur:.4f}"
@@ -425,22 +534,22 @@ else:
 nav_c1, nav_c2, nav_c3, nav_c4 = st.columns(4)
 with nav_c1:
     type_a = "primary" if st.session_state.page == "home" else "secondary"
-    if st.button("🏠 1. Ana Menü", use_container_width=True, type=type_a):
+    if st.button("Ana sayfa", use_container_width=True, type=type_a):
         go_page("home")
         st.rerun()
 with nav_c2:
     type_b = "primary" if st.session_state.page == "params" else "secondary"
-    if st.button("⚙️ 2. Parametreler (38 Kalem)", use_container_width=True, type=type_b):
+    if st.button("Parametreler", use_container_width=True, type=type_b):
         go_page("params")
         st.rerun()
 with nav_c3:
     type_c = "primary" if st.session_state.page == "calc" else "secondary"
-    if st.button("📋 3. Fiyat Çıkart (Form)", use_container_width=True, type=type_c):
+    if st.button("Teklif hesapla", use_container_width=True, type=type_c):
         go_page("calc")
         st.rerun()
 with nav_c4:
     type_d = "primary" if st.session_state.page == "teklif" else "secondary"
-    if st.button("📄 4. Müşteri Fiyat Teklifi", use_container_width=True, type=type_d):
+    if st.button("Teklif çıktısı", use_container_width=True, type=type_d):
         go_page("teklif")
         st.rerun()
 
@@ -451,34 +560,24 @@ st.markdown("---")
 # MENÜ 1: ANA SAYFA
 # ==========================================
 if st.session_state.page == "home":
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        st.markdown(
-            "<h2 style='text-align: center;'>Yönetim & Hesaplama Modülü</h2><br>",
-            unsafe_allow_html=True,
-        )
-        if st.button(
-            "1. Parametreler (Fiyat Listesi Yönetimi)",
-            use_container_width=True,
-        ):
-            go_page("params")
-            st.rerun()
-
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button(
-            "2. Fiyat Çıkart (Maliyet Hesaplama Formu)",
-            use_container_width=True,
-        ):
-            go_page("calc")
-            st.rerun()
-
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button(
-            "3. 📄 Müşteri Fiyat Teklifi Mektubu",
-            use_container_width=True,
-        ):
-            go_page("teklif")
-            st.rerun()
+    st.subheader("Başlangıç")
+    st.caption("İşletme tarifelerinizi yönetin veya yeni bir üretim teklifi hazırlayın.")
+    home_cols = st.columns(3)
+    home_actions = [
+        ("01", "Tarifeleri yönetin", "Kâğıt, baskı, kesim ve diğer işletme fiyatlarını güncelleyin.", "params", "Parametreleri aç"),
+        ("02", "Üretimi planlayın", "Ürün ölçülerini ve adetleri girip A/B/C seçeneklerini karşılaştırın.", "calc", "Teklif hesapla"),
+        ("03", "Müşteri teklifini hazırlayın", "Hesaplanan üretim maliyetlerini teklif görünümüne taşıyın.", "teklif", "Teklif çıktısını aç"),
+    ]
+    for col, (step, title, description, page_name, button_label) in zip(home_cols, home_actions):
+        with col:
+            st.markdown(
+                f"<div class='app-hero'><div class='app-hero-kicker'>ADIM {step}</div>"
+                f"<h3>{title}</h3><div class='app-hero-subtitle'>{description}</div></div>",
+                unsafe_allow_html=True,
+            )
+            if st.button(button_label, use_container_width=True, key=f"home_{page_name}"):
+                go_page(page_name)
+                st.rerun()
 
 
 # ==========================================
@@ -562,8 +661,9 @@ elif st.session_state.page == 'params':
 # MENÜ 3: FORM VE AKILLI DİNAMİK HESAPLAMA
 # ==========================================
 elif st.session_state.page == "calc":
-    st.subheader("📋 Ürün Tanımlama & Maliyet Hesaplama Formu")
-    st.markdown("---")
+    st.subheader("Teklif hesaplama")
+    st.caption("Önce ürün ve üretim bilgilerini girin; ardından A/B/C adet seçeneklerinin maliyetini karşılaştırın.")
+    st.markdown('<div class="section-kicker">01 · Sipariş bilgileri</div>', unsafe_allow_html=True)
 
     col_r1_1, col_r1_2, col_r1_3 = st.columns(3)
     with col_r1_1:
@@ -596,6 +696,7 @@ elif st.session_state.page == "calc":
     with col_r2_3:
         net_c = st.number_input("Ürün Adedi C", value=25000, min_value=1, step=100)
 
+    st.markdown('<div class="section-kicker">02 · Kâğıt ve ebat</div>', unsafe_allow_html=True)
     col_ka_head, _ = st.columns(2)
     with col_ka_head:
         ca_g, ca_c = st.columns(2)
@@ -607,6 +708,7 @@ elif st.session_state.page == "calc":
                 ["Amerikan Bristol", "Krome Karton", "Kuşe Kağıt", "1. Hamur Kağıt"],
             )
 
+    st.markdown('<div class="section-kicker">03 · Baskı</div>', unsafe_allow_html=True)
     col_ebat1, col_ebat2, col_ebat3, col_baski1, col_baski2 = st.columns(5)
     with col_ebat1:
         ebat_en = st.number_input("En (mm) [A]", value=100)
@@ -639,6 +741,7 @@ elif st.session_state.page == "calc":
             ["Yok", "1 renk zemin", "2 renk zemin", "1 renk lokal"],
         )
 
+    st.markdown('<div class="section-kicker">04 · Yüzey ve son işlemler</div>', unsafe_allow_html=True)
     c_lam, c_ob1, c_ob2, c_bs = st.columns(4)
     with c_lam:
         laminasyon = st.selectbox(
@@ -661,6 +764,7 @@ elif st.session_state.page == "calc":
             ["Düz Kesim", "Özel kesim", "Kutu Kesim + Yapıştırma"],
         )
 
+    st.markdown('<div class="section-kicker">05 · Kesim ve özel istekler</div>', unsafe_allow_html=True)
     kesim_makinesi = st.selectbox(
         "Kesim makinesi tarifesi",
         ["Kazanlı Kesim", "K. Bobts", "Bobst Kesim"],
@@ -1062,6 +1166,7 @@ elif st.session_state.page == "calc":
         {"adet": net_c, "gramaj": gramaj_a, "kagit": kagit_cinsi_a, "res": res_c, "kod": "C"}
     )
 
+    st.markdown('<div class="section-kicker">06 · Fiyatlandırma</div>', unsafe_allow_html=True)
     kar_orani = st.number_input(
         "Hedef kâr oranı (%)",
         min_value=0.0,
@@ -1425,8 +1530,9 @@ elif st.session_state.page == "calc":
     plan_cols = st.columns(3)
     for col, plan, label in zip(plan_cols, teklif_alternatifleri, ["A", "B", "C"]):
         with col:
-            st.markdown(f"##### Alternatif {label}")
-            plan_kartini_yazdir(plan)
+            with st.container(border=True):
+                st.markdown(f"##### Alternatif {label} · {plan['adet']:,} adet")
+                plan_kartini_yazdir(plan)
 
     def maliyet_dokumu_yazdir(plans, title, suffix=""):
         st.markdown(f"#### {title} — Maliyet Dökümü")
