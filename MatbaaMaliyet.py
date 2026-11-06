@@ -208,23 +208,27 @@ def score_candidate(
 
 
 def recommend(candidates: Iterable[dict]) -> dict[str, dict | None]:
-    """En düşük maliyet, en az kâğıt ve dengeli planı ayrı seçer."""
+    """Select cost, paper and explicit 1/8 production comparison candidates."""
     rows = list(candidates)
     priced = [row for row in rows if row.get("total_cost") is not None]
+    lowest_cost = min(priced, key=lambda row: row["total_cost"], default=None)
+    lowest_paper = min(
+        rows,
+        key=lambda row: (
+            row["kg"],
+            -row.get("bolunme_orani", 0),
+            row.get("total_cost", float("inf")),
+        ),
+        default=None,
+    )
+    eight_up = [row for row in priced if row.get("bolunme_orani") == 8]
+    balanced_pool = eight_up or priced
 
     return {
-        "lowest_total_cost": min(
-            priced,
-            key=lambda row: row["total_cost"],
-            default=None,
-        ),
-        "lowest_paper_use": min(
-            rows,
-            key=lambda row: row["kg"],
-            default=None,
-        ),
+        "lowest_total_cost": lowest_cost,
+        "lowest_paper_use": lowest_paper,
         "balanced": min(
-            priced,
+            balanced_pool,
             key=lambda row: (
                 row["kg"] / max(1.0, max(item["kg"] for item in priced))
                 + row["total_cost"] / max(1.0, max(item["total_cost"] for item in priced))
@@ -473,6 +477,11 @@ st.markdown(
         border-color: #354a65;
         background: #0e1929;
         color: var(--ink);
+    }
+    [data-testid="stSelectbox"] [aria-disabled="true"] {
+        opacity: 1 !important;
+        color: #dbe7f5 !important;
+        cursor: default;
     }
     [data-baseweb="popover"] [role="listbox"],
     [data-baseweb="menu"] { background: var(--panel-raised); }
@@ -964,8 +973,12 @@ elif st.session_state.page == "calc":
     with col_baski_son[5]:
         otomatik_son_islem = automatic_postpress_for_product(urun_tipi)
         if otomatik_son_islem:
-            baski_sonrasi = otomatik_son_islem
-            st.info(f"Otomatik işlem: **{baski_sonrasi}**")
+            baski_sonrasi = st.selectbox(
+                "Baskı Sonrası",
+                [otomatik_son_islem],
+                disabled=True,
+                key="otomatik_baski_sonrasi",
+            )
         else:
             baski_sonrasi = st.selectbox(
                 "Baskı Sonrası",
@@ -1309,6 +1322,7 @@ elif st.session_state.page == "calc":
                         "total_cost": toplam_maliyet,
                         "makine_kodu": makine_kodu,
                         "kesim_makinesi": kesim_makinesi,
+                        "bolunme_orani": bolunme_orani,
                         "tabaka_adeti": tabaka_adeti,
                         "montaj_detay": montaj_detay,
                     }
@@ -1397,37 +1411,19 @@ elif st.session_state.page == "calc":
         {"adet": net_c, "gramaj": gramaj_a, "kagit": kagit_cinsi_a, "res": res_c, "kod": "C"}
     )
 
-    st.markdown('<div class="section-kicker">06 · Maliyet kalemleri</div>', unsafe_allow_html=True)
-    # Read the last entered margin before calculating; its editable field is shown
-    # below the cost breakdown so the user can review costs first.
+    # The A/B/C manual expense editors are rendered below the margin controls.
+    # Read their saved values first so each rerun recalculates with the latest input.
     kar_oranlari = {
         code: float(st.session_state.get(f"hedef_kar_orani_{code}", 30.0))
         for code in ["A", "B", "C"]
     }
-    st.markdown("#### A/B/C için işletme giderleri (TL / iş)")
-    st.caption(
-        "Mücellit, nakliye ve tanımlı olmayan ekstra gider tarifeleri verilmediği için "
-        "bu tutarları her adet alternatifi için girin. Varak bedelini de ekstra giderlere ekleyin."
-    )
-    ek_giderler = {}
-    gider_sutunlari = st.columns(3)
-    for col, kod in zip(gider_sutunlari, ["A", "B", "C"]):
-        with col:
-            st.markdown(f"**Alternatif {kod}**")
-            ek_giderler[kod] = {
-                "mucellit": st.number_input(
-                    f"{kod} mücellit (₺)", min_value=0.0, value=0.0, step=100.0,
-                    key=f"mucellit_{kod}",
-                ),
-                "nakliye": st.number_input(
-                    f"{kod} nakliye (₺)", min_value=0.0, value=0.0, step=100.0,
-                    key=f"nakliye_{kod}",
-                ),
-                "ekstra": st.number_input(
-                    f"{kod} ekstra gider (₺)", min_value=0.0, value=0.0, step=100.0,
-                    key=f"ekstra_{kod}",
-                ),
-            }
+    ek_giderler = {
+        code: {
+            field: float(st.session_state.get(f"{field}_{code}", 0.0))
+            for field in ["mucellit", "nakliye", "ekstra"]
+        }
+        for code in ["A", "B", "C"]
+    }
 
     teklif_alternatifleri = [plan for plan in plan_params]
 
@@ -1531,13 +1527,8 @@ elif st.session_state.page == "calc":
     }
 
     st.markdown("### 📊 ÜRETİM VE PLANLAMA ÖZETİ")
-    st.warning(
-        "Montaj, verilen kutu açınımı formüllerinin dikdörtgen yerleşim tahminidir; "
-        "üretim öncesi gerçek ölçü ve bıçak çizimiyle doğrulayın. Amerikan Bristol ve "
-        "Krome Karton'da 600 kg'a kadar 70×100 ana tabaka kullanılır; üzerindeki "
-        "miktarlarda bobin kesim adayları da değerlendirilir. Plan maliyet sıralaması "
-        "kâğıt, baskı ve kesimle birlikte tanımlı son işlem ve bıçak tarifelerini içerir. "
-        "Makine ebat sınırına uymayan adaylar elenir."
+    st.caption(
+        "Montaj ölçü tahminidir; üretim öncesi gerçek bıçak çizimiyle doğrulanmalıdır."
     )
 
     def plan_kartini_yazdir(p):
@@ -1683,17 +1674,31 @@ elif st.session_state.page == "calc":
         oneriler_listesi = [
             ("En düşük toplam maliyet", oneriler.get("lowest_total_cost")),
             ("En az kâğıt tüketimi", oneriler.get("lowest_paper_use")),
-            ("Dengeli makine/operasyon", oneriler.get("balanced")),
+            ("Dengeli makine/operasyon · 1/8 kıyas", oneriler.get("balanced")),
         ]
+        onerilen_planlar = {}
         for etiket, secim in oneriler_listesi:
             if secim is None:
                 continue
+            plan_anahtari = (
+                secim.get("ana_tabaka"),
+                secim.get("baski_ebat_str"),
+                secim.get("kesim_makinesi"),
+                secim.get("montaj_adedi"),
+                secim.get("montaj_detay"),
+            )
+            onerilen_planlar.setdefault(
+                plan_anahtari, {"etiketler": [], "secim": secim}
+            )["etiketler"].append(etiket)
+
+        for onerilen in onerilen_planlar.values():
+            secim = onerilen["secim"]
             costs = secim["process_costs"]
             other_process_cost = sum(costs.values()) - sum(
                 costs[name] for name in ["Baskı", "Kesim", "Bıçak"]
             )
             with st.container(border=True):
-                st.markdown(f"**{etiket}**")
+                st.markdown("**" + " · ".join(onerilen["etiketler"]) + "**")
                 st.caption(
                     f"{secim['ana_ebat']} ana tabaka · {secim['baski_ebat_str']} baskı · "
                     f"{secim['kesim_makinesi']} · {secim['montaj_detay']} · "
@@ -1750,6 +1755,7 @@ elif st.session_state.page == "calc":
         # st.table renders every cost row without an inner scrolling area.
         st.table(pd.DataFrame(rows))
 
+    st.markdown('<div class="section-kicker">04 · Maliyet kalemleri</div>', unsafe_allow_html=True)
     st.markdown("### 💰 Üretim Maliyeti ve Satış Özeti")
     st.caption(
         "Kesim makinesi her plan için ebat uygunluğu ve tarifesine göre otomatik seçilir. "
@@ -1771,7 +1777,7 @@ elif st.session_state.page == "calc":
     maliyet_dokumu_yazdir(teklif_alternatifleri, f"Kâğıt ({kagit_cinsi_a})")
     st.caption("Teklif tutarları KDV hariçtir; KDV ayrıca eklenecektir.")
 
-    st.markdown('<div class="section-kicker">07 · Kâr ve satış fiyatı</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-kicker">05 · Kâr ve satış fiyatı</div>', unsafe_allow_html=True)
     st.caption(
         "A, B ve C için kâr oranını ayrı belirleyin. Girilen oran maliyete eklenir; "
         "toplam kâr marjı kâr tutarının satış toplamına oranıdır."
@@ -1788,6 +1794,29 @@ elif st.session_state.page == "calc":
                 key=f"hedef_kar_orani_{code}",
                 help="Bu alternatifin maliyetine eklenecek kâr oranı.",
             )
+
+    st.markdown('<div class="section-kicker">06 · A/B/C işletme giderleri</div>', unsafe_allow_html=True)
+    st.markdown("#### Alternatif bazında ek giderler (₺ / iş)")
+    st.caption(
+        "Mücellit, nakliye ve tarifesi tanımlanmayan giderleri her adet alternatifi için girin. "
+        "Varak bedelini ekstra gider alanına ekleyin."
+    )
+    gider_sutunlari = st.columns(3)
+    for col, kod in zip(gider_sutunlari, ["A", "B", "C"]):
+        with col:
+            st.markdown(f"**Alternatif {kod}**")
+            for field, label in [
+                ("mucellit", "mücellit"),
+                ("nakliye", "nakliye"),
+                ("ekstra", "ekstra gider"),
+            ]:
+                ek_giderler[kod][field] = st.number_input(
+                    f"{kod} {label} (₺)",
+                    min_value=0.0,
+                    value=ek_giderler[kod][field],
+                    step=100.0,
+                    key=f"{field}_{kod}",
+                )
 
     st.markdown("---")
     if st.button(

@@ -181,6 +181,17 @@ class OptimizationTests(unittest.TestCase):
         self.assertEqual(result["lowest_total_cost"]["kg"], 10)
         self.assertEqual(result["lowest_paper_use"]["total_cost"], 120)
 
+    def test_balanced_recommendation_includes_explicit_eight_up_comparison(self):
+        rows = [
+            dict(kg=10, total_cost=100, bolunme_orani=1),
+            dict(kg=10, total_cost=130, bolunme_orani=2),
+            dict(kg=10, total_cost=180, bolunme_orani=8),
+        ]
+        result = recommend(rows)
+        self.assertEqual(result["lowest_total_cost"]["bolunme_orani"], 1)
+        self.assertEqual(result["lowest_paper_use"]["bolunme_orani"], 8)
+        self.assertEqual(result["balanced"]["bolunme_orani"], 8)
+
     def test_box_and_2d_knife_costs_convert_mm_to_meter(self):
         self.assertEqual(estimate_knife_cost(100, 150, 500, is_box=True), 900)
         self.assertEqual(estimate_knife_cost(100, 150, 500), 250)
