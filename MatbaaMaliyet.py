@@ -252,6 +252,15 @@ def tiered_operation_cost(
     return ceil(quantity / tier_size) * setup_cost + quantity * unit_cost
 
 
+def cutting_operation_cost(quantity: int, included_sheets: int, setup_cost: float, excess_sheet_cost: float) -> float:
+    """Charge one cutting setup, then price only sheets above the included amount."""
+    if quantity < 0 or included_sheets <= 0 or min(setup_cost, excess_sheet_cost) < 0:
+        raise ValueError("Tabaka adedi, sınır ve kesim tarifeleri geçerli olmalıdır.")
+    if quantity == 0:
+        return 0.0
+    return setup_cost + max(0, quantity - included_sheets) * excess_sheet_cost
+
+
 def press_cost_from_params(
     params: dict,
     machine_code: str,
@@ -309,8 +318,8 @@ default_params = {
     "kab_70100_tiraj": 1.9,
     "kazanli": 1800.0,
     "kazanli_tiraj": 0.75,
-    "pedal": 2500.0,
-    "pedal_tiraj": 1.0,
+    "pedal": 1800.0,
+    "pedal_tiraj": 0.75,
     "bobst": 3000.0,
     "bobst_tiraj": 1.0,
     "omega_tek": 2000.0,
@@ -334,6 +343,8 @@ def parametreleri_yukle():
                     "b_3550_pantone": (1200.0, 900.0),
                     "b_3550_tiraj": (500.0, 400.0),
                     "bobst_tiraj": (1.5, 1.0),
+                    "pedal": (2500.0, 1800.0),
+                    "pedal_tiraj": (1.0, 0.75),
                 }
                 for key, (eski, yeni) in eski_tarifeler.items():
                     if kayitli.get(key) == eski:
@@ -515,8 +526,8 @@ elif st.session_state.page == 'params':
     with cut_col1:
         st.session_state.params['kazanli'] = st.number_input("Kazanlı kesim (1.000 adet sınırı, çember başına ₺)", value=float(st.session_state.params['kazanli']))
         st.session_state.params['kazanli_tiraj'] = st.number_input("Kazanlı kesim tiraj (adet başına, ₺)", value=float(st.session_state.params['kazanli_tiraj']))
-        st.session_state.params['pedal'] = st.number_input("Pedal kesim (1.000 adet sınırı, çember başına ₺)", value=float(st.session_state.params['pedal']))
-        st.session_state.params['pedal_tiraj'] = st.number_input("Pedal kesim tiraj (adet başına, ₺)", value=float(st.session_state.params['pedal_tiraj']))
+        st.session_state.params['pedal'] = st.number_input("K. Bobts (60×80 cm; ilk 1.000 tabaka çember başına ₺)", value=float(st.session_state.params['pedal']))
+        st.session_state.params['pedal_tiraj'] = st.number_input("K. Bobts tirajı (1.000 tabakadan sonra, tabaka başına ₺)", value=float(st.session_state.params['pedal_tiraj']))
         st.session_state.params['bobst'] = st.number_input("Bobst kesim (1.000 adet sınırı, çember başına ₺)", value=float(st.session_state.params['bobst']))
         st.session_state.params['bobst_tiraj'] = st.number_input("Bobst kesim tiraj (adet başına, ₺)", value=float(st.session_state.params['bobst_tiraj']))
     with cut_col2:
@@ -641,9 +652,9 @@ elif st.session_state.page == "calc":
 
     kesim_makinesi = st.selectbox(
         "Kesim makinesi tarifesi",
-        ["Kazanlı Kesim", "Pedal Kesim", "Bobst Kesim"],
+        ["Kazanlı Kesim", "K. Bobts", "Bobst Kesim"],
     )
-    st.caption("Kazanlı maksimum ebat: 50×70 cm. Bobst maksimum ebat: 70×100 cm. Pedal kapasite sınırı henüz girilmedi.")
+    st.caption("Kazanlı maksimum ebat: 50×70 cm. K. Bobts maksimum ebat: 60×80 cm. Bobst maksimum ebat: 70×100 cm.")
 
     ozel_istekler = st.text_input(
         "Özel İstekler",
@@ -867,6 +878,7 @@ elif st.session_state.page == "calc":
             ) in aday_listesi:
                 cutter_max = {
                     "Kazanlı Kesim": (500.0, 700.0),
+                    "K. Bobts": (600.0, 800.0),
                     "Bobst Kesim": (700.0, 1000.0),
                 }.get(kesim_makinesi)
                 if cutter_max and not sheet_fits_limits(tw, th, *cutter_max):
@@ -1069,7 +1081,7 @@ elif st.session_state.page == "calc":
 
     kesim_tarifeleri = {
         "Kazanlı Kesim": ("kazanli", "kazanli_tiraj"),
-        "Pedal Kesim": ("pedal", "pedal_tiraj"),
+        "K. Bobts": ("pedal", "pedal_tiraj"),
         "Bobst Kesim": ("bobst", "bobst_tiraj"),
     }
     setup_key, unit_key = kesim_tarifeleri[kesim_makinesi]
@@ -1107,12 +1119,19 @@ elif st.session_state.page == "calc":
             else 0.0
         )
 
-        cutting_cost = tiered_operation_cost(
-            quantity,
-            1000,
-            st.session_state.params[setup_key],
-            st.session_state.params[unit_key],
-        )
+        if kesim_makinesi == "K. Bobts":
+            cutting_cost = cutting_operation_cost(
+                quantity, 1000,
+                st.session_state.params[setup_key],
+                st.session_state.params[unit_key],
+            )
+        else:
+            cutting_cost = tiered_operation_cost(
+                quantity,
+                1000,
+                st.session_state.params[setup_key],
+                st.session_state.params[unit_key],
+            )
 
         is_box_plan = "Kutu" in urun_tipi
         glue_cost = 0.0
