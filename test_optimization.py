@@ -11,7 +11,8 @@ from typing import Iterable
 app_source = Path(__file__).with_name("MatbaaMaliyet.py").read_text(encoding="utf-8-sig")
 app_tree = ast.parse(app_source)
 helper_names = {"Rect", "Machine", "box_blank_size", "best_box_montage",
-                "bobin_cutting_allowed", "rectangular_imposition", "score_candidate", "recommend"}
+                "bobin_cutting_allowed", "rectangular_imposition", "score_candidate", "recommend",
+                "estimate_knife_cost", "tiered_operation_cost", "press_cost_from_params"}
 helper_nodes = [node for node in app_tree.body
                 if getattr(node, "name", None) in helper_names]
 helper_namespace = {"__name__": "matbaa_helpers", "dataclass": dataclass,
@@ -25,6 +26,9 @@ box_blank_size = helper_namespace["box_blank_size"]
 rectangular_imposition = helper_namespace["rectangular_imposition"]
 recommend = helper_namespace["recommend"]
 score_candidate = helper_namespace["score_candidate"]
+estimate_knife_cost = helper_namespace["estimate_knife_cost"]
+tiered_operation_cost = helper_namespace["tiered_operation_cost"]
+press_cost_from_params = helper_namespace["press_cost_from_params"]
 
 
 class OptimizationTests(unittest.TestCase):
@@ -81,6 +85,22 @@ class OptimizationTests(unittest.TestCase):
         result = recommend(rows)
         self.assertEqual(result["lowest_total_cost"]["kg"], 10)
         self.assertEqual(result["lowest_paper_use"]["total_cost"], 120)
+
+    def test_box_and_2d_knife_costs_convert_mm_to_meter(self):
+        self.assertEqual(estimate_knife_cost(100, 150, 500, is_box=True), 900)
+        self.assertEqual(estimate_knife_cost(100, 150, 500), 250)
+
+    def test_tiered_operation_cost_adds_each_setup_tier_and_run(self):
+        self.assertEqual(tiered_operation_cost(1500, 1000, 1800, 0.75), 4725)
+
+    def test_press_cost_includes_selected_pantone_units_and_omits_disabled_cmyk(self):
+        params = {
+            "b_3550_cmyk": 1800,
+            "b_3550_pantone": 900,
+            "b_3550_tiraj": 400,
+        }
+        self.assertEqual(press_cost_from_params(params, "3550", 3000, True, 2), 4800)
+        self.assertEqual(press_cost_from_params(params, "3550", 3000, False, 0), 0)
 
 
 if __name__ == "__main__":
