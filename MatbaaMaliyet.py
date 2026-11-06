@@ -254,11 +254,23 @@ def tiered_operation_cost(
 
 def cutting_operation_cost(quantity: int, included_sheets: int, setup_cost: float, excess_sheet_cost: float) -> float:
     """Charge one cutting setup, then price only sheets above the included amount."""
-    if quantity < 0 or included_sheets <= 0 or min(setup_cost, excess_sheet_cost) < 0:
-        raise ValueError("Tabaka adedi, sınır ve kesim tarifeleri geçerli olmalıdır.")
+    return included_quantity_operation_cost(
+        quantity, included_sheets, setup_cost, excess_sheet_cost
+    )
+
+
+def included_quantity_operation_cost(
+    quantity: int,
+    included_quantity: int,
+    setup_cost: float,
+    excess_unit_cost: float,
+) -> float:
+    """Charge a setup covering the included quantity, then the overage only."""
+    if quantity < 0 or included_quantity <= 0 or min(setup_cost, excess_unit_cost) < 0:
+        raise ValueError("Adet, dahil miktar ve operasyon tarifeleri geçerli olmalıdır.")
     if quantity == 0:
         return 0.0
-    return setup_cost + max(0, quantity - included_sheets) * excess_sheet_cost
+    return setup_cost + max(0, quantity - included_quantity) * excess_unit_cost
 
 
 def press_cost_from_params(
@@ -341,11 +353,11 @@ def layout_process_costs(
 
     glue_cost = 0.0
     if postpress == "Kutu Kesim + Yapıştırma" and is_box:
-        glue_cost = tiered_operation_cost(
+        glue_cost = included_quantity_operation_cost(
             order_quantity, 10000, params["omega_tek"], params["omega_tek_tiraj"]
         )
         if is_dip_glued:
-            glue_cost += tiered_operation_cost(
+            glue_cost += included_quantity_operation_cost(
                 order_quantity, 10000, params["omega_dip"], params["omega_dip_tiraj"]
             )
 
@@ -730,9 +742,9 @@ elif st.session_state.page == 'params':
         st.session_state.params['bobst_tiraj'] = st.number_input("Bobst kesim tiraj (adet başına, ₺)", value=float(st.session_state.params['bobst_tiraj']))
     with cut_col2:
         st.session_state.params['omega_tek'] = st.number_input("Omega tek kulak (10.000 adet sınırı, çember başına ₺)", value=float(st.session_state.params['omega_tek']))
-        st.session_state.params['omega_tek_tiraj'] = st.number_input("Omega tek kulak tiraj (adet başına, ₺)", value=float(st.session_state.params['omega_tek_tiraj']))
+        st.session_state.params['omega_tek_tiraj'] = st.number_input("Omega tek kulak tiraj (10.000 adedi aşan adet başına, ₺)", value=float(st.session_state.params['omega_tek_tiraj']))
         st.session_state.params['omega_dip'] = st.number_input("Omega dip yapıştırma (10.000 adet sınırı, çember başına ₺)", value=float(st.session_state.params['omega_dip']))
-        st.session_state.params['omega_dip_tiraj'] = st.number_input("Omega dip yapıştırma tiraj (adet başına, ₺)", value=float(st.session_state.params['omega_dip_tiraj']))
+        st.session_state.params['omega_dip_tiraj'] = st.number_input("Omega dip yapıştırma tiraj (10.000 adedi aşan adet başına, ₺)", value=float(st.session_state.params['omega_dip_tiraj']))
 
     st.markdown("#### 5. Bıçak Maliyeti")
     st.session_state.params['bicak_metre_fiyati'] = st.number_input(
