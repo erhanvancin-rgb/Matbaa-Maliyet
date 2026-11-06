@@ -283,6 +283,7 @@ def press_cost_from_params(
 st.set_page_config(
     page_title="Matbaa ve Ambalaj Maliyet & Teklif Sistemi",
     layout="wide",
+    initial_sidebar_state="collapsed",
 )
 
 # --- 0. KALICI JSON PARAMETRE YÖNETİMİ VE STATE SENKRONİZASYONU ---
@@ -1061,7 +1062,14 @@ elif st.session_state.page == "calc":
         {"adet": net_c, "gramaj": gramaj_a, "kagit": kagit_cinsi_a, "res": res_c, "kod": "C"}
     )
 
-    kar_orani = st.slider("Hedef Kar Marjı (%)", 0, 100, 30)
+    kar_orani = st.number_input(
+        "Hedef kâr oranı (%)",
+        min_value=0.0,
+        max_value=1000.0,
+        value=30.0,
+        step=1.0,
+        help="Teklifte kullanılacak kâr oranını yüzde olarak girin.",
+    )
     st.markdown("#### A/B/C için işletme giderleri (TL / iş)")
     st.caption(
         "Mücellit, nakliye ve tanımlı olmayan ekstra gider tarifeleri verilmediği için "
