@@ -360,8 +360,9 @@ def parametreleri_kaydet(params_dict):
     try:
         with open(PARAM_FILE, "w", encoding="utf-8") as file:
             json.dump(params_dict, file, ensure_ascii=False, indent=4)
+        return True
     except Exception:
-        pass
+        return False
 
 
 if "params" not in st.session_state:
@@ -544,8 +545,17 @@ elif st.session_state.page == 'params':
         step=10.0,
     )
 
-    parametreleri_kaydet(st.session_state.params)
-    st.success("💾 Tüm parametre değişiklikleri kalıcı olarak kaydedildi.")
+    if parametreleri_kaydet(st.session_state.params):
+        st.success("💾 Parametreler uygulamanın JSON dosyasına kaydedildi.")
+    else:
+        st.error("Parametreler JSON dosyasına kaydedilemedi.")
+    st.download_button(
+        "Güncel parametre JSON dosyasını indir",
+        data=json.dumps(st.session_state.params, ensure_ascii=False, indent=4).encode("utf-8"),
+        file_name="matbaa_parametreleri.json",
+        mime="application/json",
+        help="İndirdiğiniz dosyayı GitHub deposundaki matbaa_parametreleri.json dosyasına yükleyerek varsayılanları da güncelleyebilirsiniz.",
+    )
 
 # ==========================================
 # MENÜ 3: FORM VE AKILLI DİNAMİK HESAPLAMA
