@@ -252,6 +252,20 @@ def tiered_operation_cost(
     return ceil(quantity / tier_size) * setup_cost + quantity * unit_cost
 
 
+def pricing_summary(total_cost: float, cost_markup_percent: float) -> dict[str, float]:
+    """Calculate profit, sales total and gross margin from a cost markup."""
+    if total_cost < 0 or cost_markup_percent < 0:
+        raise ValueError("Maliyet ve kâr oranı sıfırdan küçük olamaz.")
+    total_profit = total_cost * cost_markup_percent / 100.0
+    total_sales = total_cost + total_profit
+    gross_margin_percent = total_profit / total_sales * 100.0 if total_sales else 0.0
+    return {
+        "total_profit": total_profit,
+        "total_sales": total_sales,
+        "gross_margin_percent": gross_margin_percent,
+    }
+
+
 def cutting_operation_cost(quantity: int, included_sheets: int, setup_cost: float, excess_sheet_cost: float) -> float:
     """Charge one cutting setup, then price only sheets above the included amount."""
     return included_quantity_operation_cost(
@@ -1302,7 +1316,10 @@ elif st.session_state.page == "calc":
     st.markdown('<div class="section-kicker">06 · Maliyet kalemleri</div>', unsafe_allow_html=True)
     # Read the last entered margin before calculating; its editable field is shown
     # below the cost breakdown so the user can review costs first.
-    kar_orani = float(st.session_state.get("hedef_kar_orani", 30.0))
+    kar_oranlari = {
+        code: float(st.session_state.get(f"hedef_kar_orani_{code}", 30.0))
+        for code in ["A", "B", "C"]
+    }
     st.markdown("#### A/B/C için işletme giderleri (TL / iş)")
     st.caption(
         "Mücellit, nakliye ve tanımlı olmayan ekstra gider tarifeleri verilmediği için "
@@ -1390,8 +1407,15 @@ elif st.session_state.page == "calc":
         unit_cost = total_cost / quantity if quantity else 0.0
         breakdown["Toplam Maliyet"] = total_cost
         breakdown["Birim Maliyet"] = unit_cost
+        kar_orani = kar_oranlari[code]
+        fiyat_ozeti = pricing_summary(total_cost, kar_orani)
         breakdown["Kar Oranı"] = kar_orani
-        breakdown["Birim Satış Fiyatı"] = unit_cost * (1 + kar_orani / 100)
+        breakdown["Toplam Kâr"] = fiyat_ozeti["total_profit"]
+        breakdown["Toplam Kâr Marjı"] = fiyat_ozeti["gross_margin_percent"]
+        breakdown["Toplam Satış Fiyatı"] = fiyat_ozeti["total_sales"]
+        breakdown["Birim Satış Fiyatı"] = (
+            fiyat_ozeti["total_sales"] / quantity if quantity else 0.0
+        )
         r["maliyet_dagilimi"] = breakdown
         r["toplam_uretim_maliyeti"] = total_cost
 
@@ -1413,7 +1437,7 @@ elif st.session_state.page == "calc":
         "baski_sonrasi": baski_sonrasi,
         "ozel_baski": ozel_baski_ozet,
         "ozel_istekler": ozel_istekler,
-        "kar_orani": kar_orani,
+        "kar_oranlari": kar_oranlari,
         "kesim_makinesi": kesim_makinesi,
         "ek_giderler": ek_giderler,
         "alternatifler": teklif_alternatifleri,
@@ -1621,14 +1645,19 @@ elif st.session_state.page == "calc":
         row_names = [
             "Kağıt", "Baskı", "Laminasyon", "Kesim", "Mücellit", "Yapıştırma",
             "Bıçak", "Nakliye", "Ekstra Giderler", "Toplam Maliyet",
-            "Birim Maliyet", "Kar Oranı", "Birim Satış Fiyatı",
+            "Birim Maliyet", "Kar Oranı", "Toplam Kâr", "Toplam Kâr Marjı",
+            "Toplam Satış Fiyatı", "Birim Satış Fiyatı",
         ]
         rows = []
         for name in row_names:
             row = {"Maliyet Unsuru": name}
             for code in ["A", "B", "C"]:
                 value = by_code.get(code, {}).get(name, 0.0)
-                row[code] = f"%{value:g}" if name == "Kar Oranı" else f"₺{value:,.2f}"
+                row[code] = (
+                    f"%{value:.2f}"
+                    if name in {"Kar Oranı", "Toplam Kâr Marjı"}
+                    else f"₺{value:,.2f}"
+                )
             rows.append(row)
         # st.table renders every cost row without an inner scrolling area.
         st.table(pd.DataFrame(rows))
@@ -1655,18 +1684,21 @@ elif st.session_state.page == "calc":
 
     st.markdown('<div class="section-kicker">07 · Kâr ve satış fiyatı</div>', unsafe_allow_html=True)
     st.caption(
-        "Maliyet kalemlerini inceledikten sonra hedef kâr oranını belirleyin. "
-        "Değişiklik toplam ve birim satış fiyatlarını yeniden hesaplar."
+        "A, B ve C için kâr oranını ayrı belirleyin. Girilen oran maliyete eklenir; "
+        "toplam kâr marjı kâr tutarının satış toplamına oranıdır."
     )
-    st.number_input(
-        "Hedef kâr oranı (%)",
-        min_value=0.0,
-        max_value=1000.0,
-        value=kar_orani,
-        step=1.0,
-        key="hedef_kar_orani",
-        help="Teklifte kullanılacak kâr oranını yüzde olarak girin.",
-    )
+    kar_sutunlari = st.columns(3)
+    for col, code in zip(kar_sutunlari, ["A", "B", "C"]):
+        with col:
+            st.number_input(
+                f"Alternatif {code} kâr oranı (%)",
+                min_value=0.0,
+                max_value=1000.0,
+                value=kar_oranlari[code],
+                step=1.0,
+                key=f"hedef_kar_orani_{code}",
+                help="Bu alternatifin maliyetine eklenecek kâr oranı.",
+            )
 
     st.markdown("---")
     if st.button(
@@ -1691,7 +1723,7 @@ elif st.session_state.page == "teklif":
             st.rerun()
     else:
         td = st.session_state.teklif_data
-        kar_orani = td["kar_orani"]
+        kar_oranlari = td["kar_oranlari"]
 
         st.warning(
             "Teklif toplamına kâğıt, baskı, laminasyon, seçilen kesim ve kutu yapıştırma "
@@ -1746,8 +1778,9 @@ elif st.session_state.page == "teklif":
             res = alt["res"]
             net_adet = alt["adet"]
             net_maliyet = res["toplam_uretim_maliyeti"]
-            kar_tutari = net_maliyet * (kar_orani / 100.0)
-            toplam_satis_tl = net_maliyet + kar_tutari
+            kar_orani = kar_oranlari[alt["kod"][0]]
+            fiyat_ozeti = pricing_summary(net_maliyet, kar_orani)
+            toplam_satis_tl = fiyat_ozeti["total_sales"]
             birim_satis_tl = toplam_satis_tl / net_adet if net_adet > 0 else 0
 
             table_rows.append(
@@ -1757,6 +1790,9 @@ elif st.session_state.page == "teklif":
                     "Kağıt Özelliği": f"{alt['gramaj']} gr {alt['kagit']}",
                     "Ana Tabaka": res["ana_ebat"],
                     "Kağıt Ağırlığı": f"{res['kg_kagit']} kg",
+                    "Kâr Oranı (%)": f"%{kar_orani:g}",
+                    "Toplam Kâr (TL)": f"₺{fiyat_ozeti['total_profit']:,.2f}",
+                    "Toplam Kâr Marjı (%)": f"%{fiyat_ozeti['gross_margin_percent']:.2f}",
                     "Birim Satış Fiyatı (TL)": f"₺{birim_satis_tl:,.4f}",
                     "Karlı Toplam Tutar (TL)": f"₺{toplam_satis_tl:,.2f}",
                 }
