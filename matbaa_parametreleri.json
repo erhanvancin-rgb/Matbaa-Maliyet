@@ -3,9 +3,9 @@
     "krome": 40000.0,
     "kuse": 850.0,
     "hamur": 1200.0,
-    "b_3550_cmyk": 2400.0,
-    "b_3550_pantone": 1200.0,
-    "b_3550_tiraj": 500.0,
+    "b_3550_cmyk": 1800.0,
+    "b_3550_pantone": 900.0,
+    "b_3550_tiraj": 400.0,
     "b_5070_cmyk": 3500.0,
     "b_5070_pantone": 1750.0,
     "b_5070_tiraj": 800.0,
@@ -35,5 +35,6 @@
     "omega_tek": 2000.0,
     "omega_tek_tiraj": 0.2,
     "omega_dip": 2500.0,
-    "omega_dip_tiraj": 0.25
+    "omega_dip_tiraj": 0.25,
+    "bicak_metre_fiyati": 500.0
 }

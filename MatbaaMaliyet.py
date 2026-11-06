@@ -226,9 +226,9 @@ default_params = {
     "krome": 40000.0,
     "kuse": 850.0,
     "hamur": 1200.0,
-    "b_3550_cmyk": 2400.0,
-    "b_3550_pantone": 1200.0,
-    "b_3550_tiraj": 500.0,
+    "b_3550_cmyk": 1800.0,
+    "b_3550_pantone": 900.0,
+    "b_3550_tiraj": 400.0,
     "b_5070_cmyk": 3500.0,
     "b_5070_pantone": 1750.0,
     "b_5070_tiraj": 800.0,
@@ -259,6 +259,7 @@ default_params = {
     "omega_tek_tiraj": 0.2,
     "omega_dip": 2500.0,
     "omega_dip_tiraj": 0.25,
+    "bicak_metre_fiyati": 500.0,
 }
 
 
@@ -270,6 +271,14 @@ def parametreleri_yukle():
                 for key, value in default_params.items():
                     if key not in kayitli:
                         kayitli[key] = value
+                eski_tarifeler = {
+                    "b_3550_cmyk": (2400.0, 1800.0),
+                    "b_3550_pantone": (1200.0, 900.0),
+                    "b_3550_tiraj": (500.0, 400.0),
+                }
+                for key, (eski, yeni) in eski_tarifeler.items():
+                    if kayitli.get(key) == eski:
+                        kayitli[key] = yeni
                 return kayitli
         except Exception:
             return default_params.copy()
@@ -344,7 +353,7 @@ with nav_c1:
         st.rerun()
 with nav_c2:
     type_b = "primary" if st.session_state.page == "params" else "secondary"
-    if st.button("⚙️ 2. Parametreler (37 Kalem)", use_container_width=True, type=type_b):
+    if st.button("⚙️ 2. Parametreler (38 Kalem)", use_container_width=True, type=type_b):
         go_page("params")
         st.rerun()
 with nav_c3:
@@ -398,106 +407,69 @@ if st.session_state.page == "home":
 # ==========================================
 # MENÜ 2: PARAMETRELER SAYFASI
 # ==========================================
-elif st.session_state.page == "params":
+elif st.session_state.page == 'params':
     st.subheader("Matbaa Maliyet Parametreleri Fiyat Listesi")
     col1, col2 = st.columns(2)
-
     with col1:
         st.markdown("#### 1. Kağıt ve Karton Grubu (Ton Maliyetleri)")
-        st.session_state.params["bristol"] = st.number_input(
-            "Amerikan Bristol Ton ($ USD)",
-            value=float(st.session_state.params["bristol"]),
-        )
-        st.session_state.params["krome"] = st.number_input(
-            "Krome Karton Ton (TL)",
-            value=float(st.session_state.params["krome"]),
-        )
-        st.session_state.params["kuse"] = st.number_input(
-            "Kuşe Ton (€ EUR)",
-            value=float(st.session_state.params["kuse"]),
-        )
-        st.session_state.params["hamur"] = st.number_input(
-            "1. Hamur Ton ($ USD)",
-            value=float(st.session_state.params["hamur"]),
-        )
+        st.session_state.params['bristol'] = st.number_input("Amerikan Bristol Ton ($ USD)", value=float(st.session_state.params['bristol']))
+        st.session_state.params['krome'] = st.number_input("Krome Karton Ton (TL)", value=float(st.session_state.params['krome']))
+        st.session_state.params['kuse'] = st.number_input("Kuşe Ton (€ EUR)", value=float(st.session_state.params['kuse']))
+        st.session_state.params['hamur'] = st.number_input("1. Hamur Ton ($ USD)", value=float(st.session_state.params['hamur']))
 
         st.markdown("---")
-        st.markdown("#### 2. Baskı Grubu")
-        st.session_state.params["b_3550_cmyk"] = st.number_input(
-            "35x50 CMYK Hazırlık (₺)",
-            value=float(st.session_state.params["b_3550_cmyk"]),
-        )
-        st.session_state.params["b_3550_pantone"] = st.number_input(
-            "35x50 Pantone 1 Renk (₺)",
-            value=float(st.session_state.params["b_3550_pantone"]),
-        )
-        st.session_state.params["b_3550_tiraj"] = st.number_input(
-            "35x50 Tiraj (1.000 Adet/₺)",
-            value=float(st.session_state.params["b_3550_tiraj"]),
-        )
-        st.session_state.params["b_5070_cmyk"] = st.number_input(
-            "50x70 CMYK Hazırlık (₺)",
-            value=float(st.session_state.params["b_5070_cmyk"]),
-        )
-        st.session_state.params["b_5070_pantone"] = st.number_input(
-            "50x70 Pantone 1 Renk (₺)",
-            value=float(st.session_state.params["b_5070_pantone"]),
-        )
-        st.session_state.params["b_5070_tiraj"] = st.number_input(
-            "50x70 Tiraj (1.000 Adet/₺)",
-            value=float(st.session_state.params["b_5070_tiraj"]),
-        )
-        st.session_state.params["b_70100_cmyk"] = st.number_input(
-            "70x100 CMYK Hazırlık (₺)",
-            value=float(st.session_state.params["b_70100_cmyk"]),
-        )
-        st.session_state.params["b_70100_pantone"] = st.number_input(
-            "70x100 Pantone 1 Renk (₺)",
-            value=float(st.session_state.params["b_70100_pantone"]),
-        )
-        st.session_state.params["b_70100_tiraj"] = st.number_input(
-            "70x100 Tiraj (1.000 Adet/₺)",
-            value=float(st.session_state.params["b_70100_tiraj"]),
-        )
-
+        st.markdown("#### 2. Baskı Grubu (TL)")
+        st.session_state.params['b_3550_cmyk'] = st.number_input("35×50 CMYK — baskı/proses (2.000 tabaka sınırı, ₺)", value=float(st.session_state.params['b_3550_cmyk']))
+        st.session_state.params['b_3550_pantone'] = st.number_input("35×50 Pantone 1 renk — proses (2.000 tabaka sınırı, ₺)", value=float(st.session_state.params['b_3550_pantone']))
+        st.session_state.params['b_3550_tiraj'] = st.number_input("35×50 tiraj (1.000 adet başına, ₺)", value=float(st.session_state.params['b_3550_tiraj']))
+        st.session_state.params['b_5070_cmyk'] = st.number_input("50×70 CMYK — baskı/proses (2.000 tabaka sınırı, ₺)", value=float(st.session_state.params['b_5070_cmyk']))
+        st.session_state.params['b_5070_pantone'] = st.number_input("50×70 Pantone 1 renk — proses (2.000 tabaka sınırı, ₺)", value=float(st.session_state.params['b_5070_pantone']))
+        st.session_state.params['b_5070_tiraj'] = st.number_input("50×70 tiraj (1.000 adet başına, ₺)", value=float(st.session_state.params['b_5070_tiraj']))
+        st.session_state.params['b_70100_cmyk'] = st.number_input("70×100 CMYK — baskı/proses (2.000 tabaka sınırı, ₺)", value=float(st.session_state.params['b_70100_cmyk']))
+        st.session_state.params['b_70100_pantone'] = st.number_input("70×100 Pantone 1 renk — proses (2.000 tabaka sınırı, ₺)", value=float(st.session_state.params['b_70100_pantone']))
+        st.session_state.params['b_70100_tiraj'] = st.number_input("70×100 tiraj (1.000 adet başına, ₺)", value=float(st.session_state.params['b_70100_tiraj']))
     with col2:
-        st.markdown("#### 3. Yüzey İşlemleri ve Kesim Grubu")
-        st.session_state.params["mat_sel"] = st.number_input(
-            "Mat Selofan M2 (₺)",
-            value=float(st.session_state.params["mat_sel"]),
-        )
-        st.session_state.params["par_sel"] = st.number_input(
-            "Parlak Selofan M2 (₺)",
-            value=float(st.session_state.params["par_sel"]),
-        )
-        st.session_state.params["kazanli"] = st.number_input(
-            "Kazanlı Kesim Hazırlık (₺)",
-            value=float(st.session_state.params["kazanli"]),
-        )
-        st.session_state.params["kazanli_tiraj"] = st.number_input(
-            "Kazanlı Kesim Tiraj (Adet/₺)",
-            value=float(st.session_state.params["kazanli_tiraj"]),
-        )
-        st.session_state.params["bobst"] = st.number_input(
-            "Bobst Otomatik Kesim Hazırlık (₺)",
-            value=float(st.session_state.params["bobst"]),
-        )
-        st.session_state.params["bobst_tiraj"] = st.number_input(
-            "Bobst Kesim Tiraj (Adet/₺)",
-            value=float(st.session_state.params["bobst_tiraj"]),
-        )
-        st.session_state.params["omega_tek"] = st.number_input(
-            "Omega Tek Kulak Yapıştırma (₺)",
-            value=float(st.session_state.params["omega_tek"]),
-        )
-        st.session_state.params["omega_tek_tiraj"] = st.number_input(
-            "Omega Tek Kulak Tiraj (₺)",
-            value=float(st.session_state.params["omega_tek_tiraj"]),
-        )
+        st.markdown("#### 3. Yüzey İşlemleri ve Lak Grubu")
+        st.session_state.params['disp_5070'] = st.number_input("50×70 dispresiyon lak (1.000 tabaka sınırı, ₺)", value=float(st.session_state.params['disp_5070']))
+        st.session_state.params['disp_5070_tiraj'] = st.number_input("50×70 dispresiyon lak tiraj (1.000 adet başına, ₺)", value=float(st.session_state.params['disp_5070_tiraj']))
+        st.session_state.params['disp_70100'] = st.number_input("70×100 dispresiyon lak (2.000 tabaka sınırı, ₺)", value=float(st.session_state.params['disp_70100']))
+        st.session_state.params['disp_70100_tiraj'] = st.number_input("70×100 dispresiyon lak tiraj (1.000 adet başına, ₺)", value=float(st.session_state.params['disp_70100_tiraj']))
+        st.session_state.params['mat_sel'] = st.number_input("Mat selofan (m² başına, ₺)", value=float(st.session_state.params['mat_sel']))
+        st.session_state.params['par_sel'] = st.number_input("Parlak selofan (m² başına, ₺)", value=float(st.session_state.params['par_sel']))
+        st.session_state.params['lokal_5070'] = st.number_input("50×70 lokal lak (1.000 tabaka sınırı, ₺)", value=float(st.session_state.params['lokal_5070']))
+        st.session_state.params['lokal_5070_tiraj'] = st.number_input("50×70 lokal lak tiraj (adet başına, ₺)", value=float(st.session_state.params['lokal_5070_tiraj']))
+        st.session_state.params['lokal_70100'] = st.number_input("70×100 lokal lak (1.000 tabaka sınırı, ₺)", value=float(st.session_state.params['lokal_70100']))
+        st.session_state.params['lokal_70100_tiraj'] = st.number_input("70×100 lokal lak tiraj (adet başına, ₺)", value=float(st.session_state.params['lokal_70100_tiraj']))
+        st.session_state.params['kab_5070'] = st.number_input("50×70 kabartma lak (1.000 tabaka sınırı, ₺)", value=float(st.session_state.params['kab_5070']))
+        st.session_state.params['kab_5070_tiraj'] = st.number_input("50×70 kabartma lak tiraj (adet başına, ₺)", value=float(st.session_state.params['kab_5070_tiraj']))
+        st.session_state.params['kab_70100'] = st.number_input("70×100 kabartma lak (1.000 tabaka sınırı, ₺)", value=float(st.session_state.params['kab_70100']))
+        st.session_state.params['kab_70100_tiraj'] = st.number_input("70×100 kabartma lak tiraj (adet başına, ₺)", value=float(st.session_state.params['kab_70100_tiraj']))
+
+    st.markdown("#### 4. Kesim ve Mücellit Grubu")
+    cut_col1, cut_col2 = st.columns(2)
+    with cut_col1:
+        st.session_state.params['kazanli'] = st.number_input("Kazanlı kesim (1.000 adet sınırı, çember başına ₺)", value=float(st.session_state.params['kazanli']))
+        st.session_state.params['kazanli_tiraj'] = st.number_input("Kazanlı kesim tiraj (adet başına, ₺)", value=float(st.session_state.params['kazanli_tiraj']))
+        st.session_state.params['pedal'] = st.number_input("Pedal kesim (1.000 adet sınırı, çember başına ₺)", value=float(st.session_state.params['pedal']))
+        st.session_state.params['pedal_tiraj'] = st.number_input("Pedal kesim tiraj (adet başına, ₺)", value=float(st.session_state.params['pedal_tiraj']))
+        st.session_state.params['bobst'] = st.number_input("Bobst kesim (1.000 adet sınırı, çember başına ₺)", value=float(st.session_state.params['bobst']))
+        st.session_state.params['bobst_tiraj'] = st.number_input("Bobst kesim tiraj (adet başına, ₺)", value=float(st.session_state.params['bobst_tiraj']))
+    with cut_col2:
+        st.session_state.params['omega_tek'] = st.number_input("Omega tek kulak (10.000 adet sınırı, çember başına ₺)", value=float(st.session_state.params['omega_tek']))
+        st.session_state.params['omega_tek_tiraj'] = st.number_input("Omega tek kulak tiraj (adet başına, ₺)", value=float(st.session_state.params['omega_tek_tiraj']))
+        st.session_state.params['omega_dip'] = st.number_input("Omega dip yapıştırma (10.000 adet sınırı, çember başına ₺)", value=float(st.session_state.params['omega_dip']))
+        st.session_state.params['omega_dip_tiraj'] = st.number_input("Omega dip yapıştırma tiraj (adet başına, ₺)", value=float(st.session_state.params['omega_dip_tiraj']))
+
+    st.markdown("#### 5. Bıçak Maliyeti")
+    st.session_state.params['bicak_metre_fiyati'] = st.number_input(
+        "Bıçak fiyatı (metre başına, ₺)",
+        value=float(st.session_state.params['bicak_metre_fiyati']),
+        min_value=0.0,
+        step=10.0,
+    )
 
     parametreleri_kaydet(st.session_state.params)
     st.success("💾 Tüm parametre değişiklikleri kalıcı olarak kaydedildi.")
-
 
 # ==========================================
 # MENÜ 3: FORM VE AKILLI DİNAMİK HESAPLAMA
