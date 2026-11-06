@@ -13,7 +13,7 @@ app_tree = ast.parse(app_source)
 helper_names = {"Rect", "Machine", "box_blank_size", "best_box_montage",
                 "bobin_cutting_allowed", "rectangular_imposition", "score_candidate", "recommend",
                 "estimate_knife_cost", "tiered_operation_cost", "press_cost_from_params",
-                "cutting_operation_cost", "layout_process_costs", "sheet_fits_limits"}
+                "cutting_operation_cost", "sheet_fits_limits"}
 helper_nodes = [node for node in app_tree.body
                 if getattr(node, "name", None) in helper_names]
 helper_namespace = {"__name__": "matbaa_helpers", "dataclass": dataclass,
@@ -31,7 +31,6 @@ estimate_knife_cost = helper_namespace["estimate_knife_cost"]
 tiered_operation_cost = helper_namespace["tiered_operation_cost"]
 cutting_operation_cost = helper_namespace["cutting_operation_cost"]
 press_cost_from_params = helper_namespace["press_cost_from_params"]
-layout_process_costs = helper_namespace["layout_process_costs"]
 sheet_fits_limits = helper_namespace["sheet_fits_limits"]
 
 
@@ -102,7 +101,7 @@ class OptimizationTests(unittest.TestCase):
         self.assertEqual(cutting_operation_cost(1500, 1000, 1800, 0.75), 2175)
         self.assertEqual(cutting_operation_cost(0, 1000, 1800, 0.75), 0)
 
-    def test_press_tirage_is_priced_per_1000_press_sheets(self):
+    def test_press_tirage_is_priced_per_1000_finished_products(self):
         params = {
             "b_3550_cmyk": 1800,
             "b_3550_pantone": 900,
@@ -110,69 +109,6 @@ class OptimizationTests(unittest.TestCase):
         }
         self.assertEqual(press_cost_from_params(params, "3550", 1500, True, 2), 4200)
         self.assertEqual(press_cost_from_params(params, "3550", 3000, False, 0), 0)
-
-    def test_layout_uses_the_same_press_sheet_count_for_print_and_cut(self):
-        params = {
-            "b_3550_cmyk": 1800, "b_3550_pantone": 900, "b_3550_tiraj": 400,
-            "kazanli": 1800, "kazanli_tiraj": 0.75,
-            "pedal": 1800, "pedal_tiraj": 0.75,
-            "bobst": 3000, "bobst_tiraj": 1.0,
-            "bicak_metre_fiyati": 500,
-            "omega_tek": 2000, "omega_tek_tiraj": 0.2,
-            "omega_dip": 2500, "omega_dip_tiraj": 0.25,
-        }
-        costs = layout_process_costs(
-            params=params,
-            press_code="3550",
-            sheet_quantity=1500,
-            order_quantity=5000,
-            cutting_machine="Kazanlı Kesim",
-            cmyk_enabled=True,
-            pantone_colors=0,
-            lamination="Yok",
-            special_finishes=[],
-            product_width_mm=100,
-            product_length_mm=150,
-            is_box=True,
-            is_dip_glued=False,
-            special_cut=False,
-            postpress="Düz Kesim",
-            total_area_m2=1.0,
-        )
-        self.assertEqual(costs["Baskı"], 2400)
-        self.assertEqual(costs["Kesim"], 4725)
-        self.assertEqual(costs["Bıçak"], 900)
-
-    def test_k_bobts_excess_is_based_on_print_sheets_not_order_units(self):
-        params = {
-            "b_3550_cmyk": 1800, "b_3550_pantone": 900, "b_3550_tiraj": 400,
-            "kazanli": 1800, "kazanli_tiraj": 0.75,
-            "pedal": 1800, "pedal_tiraj": 0.75,
-            "bobst": 3000, "bobst_tiraj": 1.0,
-            "bicak_metre_fiyati": 500,
-            "omega_tek": 2000, "omega_tek_tiraj": 0.2,
-            "omega_dip": 2500, "omega_dip_tiraj": 0.25,
-        }
-        costs = layout_process_costs(
-            params=params,
-            press_code="3550",
-            sheet_quantity=1500,
-            order_quantity=25000,
-            cutting_machine="K. Bobts",
-            cmyk_enabled=True,
-            pantone_colors=0,
-            lamination="Yok",
-            special_finishes=[],
-            product_width_mm=100,
-            product_length_mm=150,
-            is_box=False,
-            is_dip_glued=False,
-            special_cut=False,
-            postpress="Düz Kesim",
-            total_area_m2=1.0,
-        )
-        self.assertEqual(costs["Baskı"], 2400)
-        self.assertEqual(costs["Kesim"], 2175)
 
     def test_cutting_machine_size_limits_allow_rotation(self):
         self.assertTrue(sheet_fits_limits(500, 700, 500, 700))

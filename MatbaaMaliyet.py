@@ -268,7 +268,7 @@ def press_cost_from_params(
     cmyk_enabled: bool,
     pantone_colors: int = 0,
 ) -> float:
-    """Add press setup charges and tirage priced per 1,000 press sheets."""
+    """Add setup charges and tirage priced per 1,000 finished products."""
     if quantity < 0 or pantone_colors < 0:
         raise ValueError("Baskı adedi ve renk sayısı geçerli olmalıdır.")
     if quantity == 0:
@@ -278,97 +278,6 @@ def press_cost_from_params(
     run_rate = params.get(f"b_{machine_code}_tiraj", 0.0)
     run_cost = quantity / 1000 * run_rate if cmyk_enabled or pantone_colors else 0.0
     return cmyk_setup + pantone_setup + run_cost
-
-
-def layout_process_costs(
-    params: dict,
-    press_code: str,
-    sheet_quantity: int,
-    order_quantity: int,
-    cutting_machine: str,
-    cmyk_enabled: bool,
-    pantone_colors: int,
-    lamination: str,
-    special_finishes: Iterable[str],
-    product_width_mm: float,
-    product_length_mm: float,
-    is_box: bool,
-    is_dip_glued: bool,
-    special_cut: bool,
-    postpress: str,
-    total_area_m2: float,
-) -> dict:
-    """Price one imposition using the same printed-sheet count for press and cutting."""
-    press_cost = press_cost_from_params(
-        params, press_code, sheet_quantity, cmyk_enabled, pantone_colors
-    )
-
-    cutter_keys = {
-        "Kazanlı Kesim": ("kazanli", "kazanli_tiraj"),
-        "K. Bobts": ("pedal", "pedal_tiraj"),
-        "Bobst Kesim": ("bobst", "bobst_tiraj"),
-    }
-    setup_key, tirage_key = cutter_keys[cutting_machine]
-    if cutting_machine == "K. Bobts":
-        cutting_cost = cutting_operation_cost(
-            sheet_quantity, 1000, params[setup_key], params[tirage_key]
-        )
-    else:
-        cutting_cost = tiered_operation_cost(
-            sheet_quantity, 1000, params[setup_key], params[tirage_key]
-        )
-
-    lamination_key = {
-        "Mat Selofan": "mat_sel",
-        "Parlak Selofan": "par_sel",
-    }.get(lamination)
-    lamination_cost = total_area_m2 * params[lamination_key] if lamination_key else 0.0
-
-    knife_cost = 0.0
-    if is_box or special_cut:
-        knife_cost = estimate_knife_cost(
-            product_width_mm,
-            product_length_mm,
-            params["bicak_metre_fiyati"],
-            is_box=is_box,
-        )
-
-    glue_cost = 0.0
-    if postpress == "Kutu Kesim + Yapıştırma" and is_box:
-        glue_cost = tiered_operation_cost(
-            order_quantity, 10000, params["omega_tek"], params["omega_tek_tiraj"]
-        )
-        if is_dip_glued:
-            glue_cost += tiered_operation_cost(
-                order_quantity, 10000, params["omega_dip"], params["omega_dip_tiraj"]
-            )
-
-    lacquer_cost = 0.0
-    lacquer_size = {"5070": "5070", "70100": "70100"}.get(press_code)
-    for finish in special_finishes:
-        if finish not in {"Dispresiyon Lak", "Lokal Lak", "Kabartma Lak"} or not lacquer_size:
-            continue
-        if finish == "Dispresiyon Lak":
-            setup_limit = 1000 if lacquer_size == "5070" else 2000
-            lacquer_cost += (
-                ceil(sheet_quantity / setup_limit) * params[f"disp_{lacquer_size}"]
-                + order_quantity / 1000 * params[f"disp_{lacquer_size}_tiraj"]
-            )
-        else:
-            prefix = "lokal" if finish == "Lokal Lak" else "kab"
-            lacquer_cost += (
-                ceil(sheet_quantity / 1000) * params[f"{prefix}_{lacquer_size}"]
-                + order_quantity * params[f"{prefix}_{lacquer_size}_tiraj"]
-            )
-
-    return {
-        "Baskı": press_cost,
-        "Kesim": cutting_cost,
-        "Laminasyon": lamination_cost,
-        "Bıçak": knife_cost,
-        "Yapıştırma": glue_cost,
-        "Ekstra Giderler": lacquer_cost,
-    }
 
 
 st.set_page_config(
@@ -1151,29 +1060,17 @@ elif st.session_state.page == "calc":
                     "1 renk lokal": 1,
                 }.get(pantone_secimi, 0)
                 cmyk_enabled = cmyk_secim != "CMYK Baskı yok"
-                process_costs = layout_process_costs(
-                    params=params,
-                    press_code=makine_kodu,
-                    sheet_quantity=baskiya_giren_tabaka_adeti,
-                    order_quantity=net_adet,
-                    cutting_machine=kesim_makinesi,
-                    cmyk_enabled=cmyk_enabled,
-                    pantone_colors=pantone_colors,
-                    lamination=laminasyon,
-                    special_finishes=[ozel_baski_1, ozel_baski_2],
-                    product_width_mm=ebat_en,
-                    product_length_mm=ebat_boy,
-                    is_box=is_kutu,
-                    is_dip_glued=urun_tipi == "Dip Kilit Yapıştırmalı Kutu",
-                    special_cut=baski_sonrasi == "Özel kesim",
-                    postpress=baski_sonrasi,
-                    total_area_m2=toplam_m2,
+                baski_maliyeti = press_cost_from_params(
+                    params,
+                    makine_kodu,
+                    net_adet,
+                    cmyk_enabled,
+                    pantone_colors,
                 )
-                baski_maliyeti = process_costs["Baskı"]
-                kesim_maliyeti = process_costs["Kesim"]
-                bicak_maliyeti = process_costs["Bıçak"]
 
-                toplam_maliyet = kagit_maliyeti + sum(process_costs.values())
+                # Kesim ve diğer işlemlerin gerçek tarifesi modele eklenmediği için
+                # burada tahmini sabit bir kesim bedeli kullanılmıyor.
+                toplam_maliyet = kagit_maliyeti + baski_maliyeti
 
                 aday_sonuclari.append(
                     {
@@ -1183,10 +1080,6 @@ elif st.session_state.page == "calc":
                         "kg": kg_kagit,
                         "kagit_maliyeti": kagit_maliyeti,
                         "baski_maliyeti": baski_maliyeti,
-                        "kesim_maliyeti": kesim_maliyeti,
-                        "bicak_maliyeti": bicak_maliyeti,
-                        "process_costs": process_costs,
-                        "press_sheets": baskiya_giren_tabaka_adeti,
                         "total_cost": toplam_maliyet,
                         "makine_kodu": makine_kodu,
                         "tabaka_adeti": tabaka_adeti,
@@ -1218,7 +1111,7 @@ elif st.session_state.page == "calc":
                         "baski_maliyeti": baski_maliyeti,
                         "toplam_uretim_maliyeti": toplam_maliyet,
                         "makine_kodu": makine_kodu,
-                        "kesim_maliyeti_dahil": True,
+                        "kesim_maliyeti_dahil": False,
                         "geometri_dogrulama_gerekli": is_kutu,
                     }
                 elif abs(toplam_maliyet - min_maliyet) < 1.0:
@@ -1238,11 +1131,9 @@ elif st.session_state.page == "calc":
                             "kg_kagit": kg_kagit,
                             "kagit_maliyeti": kagit_maliyeti,
                             "baski_maliyeti": baski_maliyeti,
-                            "kesim_maliyeti": kesim_maliyeti,
-                            "bicak_maliyeti": bicak_maliyeti,
                             "toplam_uretim_maliyeti": toplam_maliyet,
                             "makine_kodu": makine_kodu,
-                            "kesim_maliyeti_dahil": True,
+                            "kesim_maliyeti_dahil": False,
                             "geometri_dogrulama_gerekli": is_kutu,
                         }
 
@@ -1306,6 +1197,12 @@ elif st.session_state.page == "calc":
 
     teklif_alternatifleri = [plan for plan in plan_params]
 
+    kesim_tarifeleri = {
+        "Kazanlı Kesim": ("kazanli", "kazanli_tiraj"),
+        "K. Bobts": ("pedal", "pedal_tiraj"),
+        "Bobst Kesim": ("bobst", "bobst_tiraj"),
+    }
+    setup_key, unit_key = kesim_tarifeleri[kesim_makinesi]
     pantone_colors = {
         "Yok": 0,
         "1 renk zemin": 1,
@@ -1320,34 +1217,89 @@ elif st.session_state.page == "calc":
         press_code = r["makine_kodu"]
         press_sheets = r["baskiya_giren_tabaka"]
 
-        is_box_plan = "Kutu" in urun_tipi
-        process_costs = layout_process_costs(
-            params=st.session_state.params,
-            press_code=press_code,
-            sheet_quantity=press_sheets,
-            order_quantity=quantity,
-            cutting_machine=kesim_makinesi,
-            cmyk_enabled=cmyk_secim != "CMYK Baskı yok",
-            pantone_colors=pantone_colors,
-            lamination=laminasyon,
-            special_finishes=[ozel_baski_1, ozel_baski_2],
-            product_width_mm=ebat_en,
-            product_length_mm=ebat_boy,
-            is_box=is_box_plan,
-            is_dip_glued=urun_tipi == "Dip Kilit Yapıştırmalı Kutu",
-            special_cut=baski_sonrasi == "Özel kesim",
-            postpress=baski_sonrasi,
-            total_area_m2=r["toplam_m2"],
-        )
         paper_cost = r["kagit_maliyeti"]
-        print_cost = process_costs["Baskı"]
-        cutting_cost = process_costs["Kesim"]
-        lamination_cost = process_costs["Laminasyon"]
-        knife_cost = process_costs["Bıçak"]
-        glue_cost = process_costs["Yapıştırma"]
-        lacquer_cost = process_costs["Ekstra Giderler"]
+        print_cost = press_cost_from_params(
+            st.session_state.params,
+            press_code,
+            quantity,
+            cmyk_secim != "CMYK Baskı yok",
+            pantone_colors,
+        )
         r["baski_maliyeti"] = print_cost
-        r["kesim_maliyeti"] = cutting_cost
+
+        lamination_key = {
+            "Mat Selofan": "mat_sel",
+            "Parlak Selofan": "par_sel",
+        }.get(laminasyon)
+        lamination_cost = (
+            r["toplam_m2"] * st.session_state.params[lamination_key]
+            if lamination_key
+            else 0.0
+        )
+
+        if kesim_makinesi == "K. Bobts":
+            cutting_cost = cutting_operation_cost(
+                quantity, 1000,
+                st.session_state.params[setup_key],
+                st.session_state.params[unit_key],
+            )
+        else:
+            cutting_cost = tiered_operation_cost(
+                quantity,
+                1000,
+                st.session_state.params[setup_key],
+                st.session_state.params[unit_key],
+            )
+
+        is_box_plan = "Kutu" in urun_tipi
+        glue_cost = 0.0
+        if baski_sonrasi == "Kutu Kesim + Yapıştırma" and is_box_plan:
+            glue_cost = tiered_operation_cost(
+                quantity, 10000,
+                st.session_state.params["omega_tek"],
+                st.session_state.params["omega_tek_tiraj"],
+            )
+            if urun_tipi == "Dip Kilit Yapıştırmalı Kutu":
+                glue_cost += tiered_operation_cost(
+                    quantity, 10000,
+                    st.session_state.params["omega_dip"],
+                    st.session_state.params["omega_dip_tiraj"],
+                )
+
+        if is_box_plan:
+            knife_cost = estimate_knife_cost(
+                ebat_en, ebat_boy,
+                st.session_state.params["bicak_metre_fiyati"],
+                is_box=True,
+            )
+        elif baski_sonrasi == "Özel kesim":
+            knife_cost = estimate_knife_cost(
+                ebat_en, ebat_boy,
+                st.session_state.params["bicak_metre_fiyati"],
+            )
+        else:
+            knife_cost = 0.0
+
+        lacquer_cost = 0.0
+        lacquer_size = {"5070": "5070", "70100": "70100"}.get(press_code)
+        for finish in [ozel_baski_1, ozel_baski_2]:
+            if finish not in {"Dispresiyon Lak", "Lokal Lak", "Kabartma Lak"} or not lacquer_size:
+                continue
+            if finish == "Dispresiyon Lak":
+                disp_limit = 1000 if lacquer_size == "5070" else 2000
+                lacquer_cost += (
+                    math.ceil(press_sheets / disp_limit)
+                    * st.session_state.params[f"disp_{lacquer_size}"]
+                    + quantity / 1000
+                    * st.session_state.params[f"disp_{lacquer_size}_tiraj"]
+                )
+            else:
+                prefix = "lokal" if finish == "Lokal Lak" else "kab"
+                lacquer_cost += (
+                    math.ceil(press_sheets / 1000)
+                    * st.session_state.params[f"{prefix}_{lacquer_size}"]
+                    + quantity * st.session_state.params[f"{prefix}_{lacquer_size}_tiraj"]
+                )
 
         manual = ek_giderler[code]
         breakdown = {
@@ -1397,11 +1349,11 @@ elif st.session_state.page == "calc":
     st.markdown("### 📊 ÜRETİM VE PLANLAMA ÖZETİ")
     st.warning(
         "Montaj, verilen kutu açınımı formüllerinin dikdörtgen yerleşim tahminidir; "
-        "üretim öncesi gerçek ölçü ve bıçak çizimiyle doğrulayın. Amerikan Bristol ve "
-        "Krome Karton'da 600 kg'a kadar 70×100 ana tabaka kullanılır; üzerindeki "
-        "miktarlarda bobin kesim adayları da değerlendirilir. Plan maliyet sıralaması "
-        "kâğıt, baskı ve kesimle birlikte tanımlı son işlem ve bıçak tarifelerini içerir. "
-        "Makine ebat sınırına uymayan adaylar elenir."
+        "gerçek ölçü ve bıçak çizimiyle doğrulayın. Amerikan Bristol ve Krome Karton'da "
+        "600 kg'a kadar 70×100 ana tabaka kullanılır; üzerindeki miktarlarda bobin kesim "
+        "adayları da değerlendirilir. Aşağıdaki maliyet dökümü seçilen kesim tarifesini, "
+        "tanımlı laminasyon/yapıştırma/lak fiyatlarını ve girilen ek giderleri toplar. "
+        "Kesim makinesi kapasitesi bu ekranda doğrulanmaz."
     )
 
     def plan_kartini_yazdir(p):
@@ -1544,36 +1496,31 @@ elif st.session_state.page == "calc":
         st.table(plan_df)
 
         oneriler = r.get("oneriler", {})
-        oneriler_listesi = [
-            ("En düşük toplam maliyet", oneriler.get("lowest_total_cost")),
-            ("En az kâğıt tüketimi", oneriler.get("lowest_paper_use")),
-            ("Dengeli makine/operasyon", oneriler.get("balanced")),
-        ]
-        for etiket, secim in oneriler_listesi:
-            if secim is None:
-                continue
-            costs = secim["process_costs"]
-            other_process_cost = sum(costs.values()) - sum(
-                costs[name] for name in ["Baskı", "Kesim", "Bıçak"]
-            )
-            with st.container(border=True):
-                st.markdown(f"**{etiket}**")
-                st.caption(
-                    f"{secim['ana_ebat']} ana tabaka · {secim['baski_ebat_str']} baskı · "
-                    f"{secim['montaj_detay']} · montajda {secim['montaj_adedi']} ürün"
-                )
-                st.write(
-                    f"Baskı/kesim: **{secim['press_sheets']:,} tabaka** · "
-                    f"Kâğıt: **{secim['kg']:,.2f} kg**"
-                )
-                st.caption(
-                    f"Kâğıt ₺{secim['kagit_maliyeti']:,.2f} · "
-                    f"Baskı ₺{costs['Baskı']:,.2f} · "
-                    f"Kesim ₺{costs['Kesim']:,.2f} · "
-                    f"Bıçak ₺{costs['Bıçak']:,.2f} · "
-                    f"Diğer işlemler ₺{other_process_cost:,.2f}"
-                )
-                st.markdown(f"**Plan tarifeli maliyeti: ₺{secim['total_cost']:,.2f}**")
+        oneriler_df = pd.DataFrame(
+            [
+                {
+                    "Plan": etiket,
+                    "Tabaka": secim["ana_ebat"],
+                    "Baskı ebatı": secim["baski_ebat_str"],
+                    "Montaj modülü": secim["montaj_detay"],
+                    "Montaj": secim["montaj_adedi"],
+                    "Kâğıt (kg)": round(secim["kg"], 2),
+                    "Kâğıt + baskı (₺)": round(secim["total_cost"], 2),
+                }
+                for etiket, secim in [
+                    ("En düşük kâğıt + baskı", oneriler.get("lowest_total_cost")),
+                    ("En az kâğıt", oneriler.get("lowest_paper_use")),
+                    ("Dengeli", oneriler.get("balanced")),
+                ]
+                if secim is not None
+            ]
+        )
+
+        st.caption(
+            "Aşağıdaki sıralama mevcut kâğıt ve baskı girdileriyle yapılır; "
+            "kesim ve sonraki işlem tarifeleri eksik olduğu için gerçek toplam maliyeti göstermez."
+        )
+        st.dataframe(oneriler_df, use_container_width=True, hide_index=True)
 
     plan_cols = st.columns(3)
     for col, plan, label in zip(plan_cols, teklif_alternatifleri, ["A", "B", "C"]):
