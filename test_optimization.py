@@ -1,6 +1,30 @@
+import ast
+import math
 import unittest
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Iterable
 
-from optimization import Machine, Rect, best_box_montage, bobin_cutting_allowed, box_blank_size, rectangular_imposition, recommend, score_candidate
+
+# Load just the pure planning helpers from the single application source file,
+# without importing Streamlit's interactive page.
+app_source = Path(__file__).with_name("MatbaaMaliyet.py").read_text(encoding="utf-8-sig")
+app_tree = ast.parse(app_source)
+helper_names = {"Rect", "Machine", "box_blank_size", "best_box_montage",
+                "bobin_cutting_allowed", "rectangular_imposition", "score_candidate", "recommend"}
+helper_nodes = [node for node in app_tree.body
+                if getattr(node, "name", None) in helper_names]
+helper_namespace = {"__name__": "matbaa_helpers", "dataclass": dataclass,
+                    "ceil": math.ceil, "Iterable": Iterable}
+exec(compile(ast.Module(body=helper_nodes, type_ignores=[]), "MatbaaMaliyet.py", "exec"), helper_namespace)
+Rect = helper_namespace["Rect"]
+Machine = helper_namespace["Machine"]
+best_box_montage = helper_namespace["best_box_montage"]
+bobin_cutting_allowed = helper_namespace["bobin_cutting_allowed"]
+box_blank_size = helper_namespace["box_blank_size"]
+rectangular_imposition = helper_namespace["rectangular_imposition"]
+recommend = helper_namespace["recommend"]
+score_candidate = helper_namespace["score_candidate"]
 
 
 class OptimizationTests(unittest.TestCase):
