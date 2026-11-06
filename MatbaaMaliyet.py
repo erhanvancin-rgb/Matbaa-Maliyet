@@ -5,6 +5,7 @@ import math
 import pandas as pd
 import json
 import os
+from optimization import rectangular_imposition, recommend, Rect
 
 st.set_page_config(page_title="Matbaa ve Ambalaj Maliyet & Teklif Sistemi", layout="wide")
 
@@ -230,27 +231,19 @@ elif st.session_state.page == 'calc':
         elif machine_code == "5070": return 12.0
         else: return 10.0
 
-    # NİHAİ ÇÖZÜM: MASTER MATBAA VERİMLİLİK ÇARPANI (INTERLOCK MANTIĞI)
+    # Dikdörtgen yerleşim tahminidir; gerçek bıçak çizimi ayrıca doğrulanmalıdır.
     def akilli_montaj_hesapla(w_avail, h_avail, ebat_en, ebat_boy, ebat_yuk):
         if not is_kutu:
             w_net = ebat_en + 3.0
             h_net = ebat_boy + 3.0
-            return max(int(w_avail // w_net) * int(h_avail // h_net), int(w_avail // h_net) * int(h_avail // w_net))
+            return rectangular_imposition(Rect(w_avail, h_avail), Rect(w_net, h_net))
         
         # Düz Bounding Box Alan İhtiyacı (Bıçak ve Makas paylarıyla)
         w_net = (ebat_en * 2) + (ebat_yuk * 2) + 15.0
         h_net = ebat_boy + (ebat_yuk * 2) + 30.0
         
-        m1 = int(w_avail // w_net) * int(h_avail // h_net)
-        m2 = int(w_avail // h_net) * int(h_avail // w_net)
-        base_montaj = max(m1, m2)
-        
-        # MATBAA USTASI KURALI: 
-        # Sizin tecrübenize göre 33,3x35 (1 ürün), 33,3x70 (2 ürün) ve 60x100 (8 ürün) çıkıyor.
-        # Bu verimi pürüzsüz yakalayan altın oran çarpanı (1.334) ters-düz kapak kilitlenmesini simüle eder.
-        if base_montaj > 0:
-            return int(base_montaj * 1.334)
-        return base_montaj
+        # Açınımın bounding box'ı üzerinden ızgara hesabı; bıçak yerleşimini kanıtlamaz.
+        return rectangular_imposition(Rect(w_avail, h_avail), Rect(w_net, h_net))
 
     # BOBİN HASSASİYETİ (84-96 CM ENGELLENDİ, SADECE 5 CM KATLARI)
     def bobin_adaylarini_uret():
@@ -295,6 +288,7 @@ elif st.session_state.page == 'calc':
 
         en_iyi_secim = None
         min_maliyet = float('inf')
+        aday_sonuclari = []
 
         def adaylari_degerlendir(aday_listesi):
             nonlocal en_iyi_secim, min_maliyet
@@ -335,7 +329,16 @@ elif st.session_state.page == 'calc':
                 
                 # YAPAY CEZA (verim_orani) TAMAMEN KALDIRILDI! 
                 # Pür matematik maliyeti karar verecek.
-                toplam_maliyet = kagit_maliyeti + baski_maliyeti + 400.0 
+                # Kesim ve sonraki işlemlerin seçili makine tarifesi henüz modele bağlı değil.
+                # 400 TL sabit tahminini kaldırıp eksik girdiyi sonuçta açıkça gösteriyoruz.
+                toplam_maliyet = kagit_maliyeti + baski_maliyeti
+                aday_sonuclari.append({
+                    "ana_ebat": ana_tabaka, "baski_ebat_str": baski_ebat_adi,
+                    "montaj_adedi": montaj, "kg": kg_kagit,
+                    "kagit_maliyeti": kagit_maliyeti, "baski_maliyeti": baski_maliyeti,
+                    "total_cost": toplam_maliyet, "makine_kodu": makine_kodu,
+                    "tabaka_adeti": tabaka_adeti,
+                })
                 
                 brut_adet = baskiya_giren_tabaka_adeti * montaj
                 fire_pct_ortalama = round((fire_tabaka / max(1, net_baski_tabaka)) * 100.0, 1)
@@ -347,7 +350,8 @@ elif st.session_state.page == 'calc':
                         "montaj_adedi": montaj, "tabaka_adeti": tabaka_adeti, "baskiya_giren_tabaka": baskiya_giren_tabaka_adeti,
                         "ana_ebat": ana_tabaka, "baski_ebat_str": baski_ebat_adi, "toplam_m2": toplam_m2,
                         "kg_kagit": kg_kagit, "kagit_maliyeti": kagit_maliyeti, "baski_maliyeti": baski_maliyeti,
-                        "toplam_uretim_maliyeti": toplam_maliyet, "makine_kodu": makine_kodu
+                        "toplam_uretim_maliyeti": toplam_maliyet, "makine_kodu": makine_kodu,
+                        "kesim_maliyeti_dahil": False, "geometri_dogrulama_gerekli": is_kutu
                     }
                 # Maliyet eşitliğinde kağıdı (m2/kg) az harcayanı seç
                 elif abs(toplam_maliyet - min_maliyet) < 1.0:
@@ -358,7 +362,8 @@ elif st.session_state.page == 'calc':
                             "montaj_adedi": montaj, "tabaka_adeti": tabaka_adeti, "baskiya_giren_tabaka": baskiya_giren_tabaka_adeti,
                             "ana_ebat": ana_tabaka, "baski_ebat_str": baski_ebat_adi, "toplam_m2": toplam_m2,
                             "kg_kagit": kg_kagit, "kagit_maliyeti": kagit_maliyeti, "baski_maliyeti": baski_maliyeti,
-                            "toplam_uretim_maliyeti": toplam_maliyet, "makine_kodu": makine_kodu
+                            "toplam_uretim_maliyeti": toplam_maliyet, "makine_kodu": makine_kodu,
+                            "kesim_maliyeti_dahil": False, "geometri_dogrulama_gerekli": is_kutu
                         }
 
         adaylari_degerlendir(standart_adaylar)
@@ -369,12 +374,10 @@ elif st.session_state.page == 'calc':
             adaylari_degerlendir(dinamik_bobinler)
 
         if en_iyi_secim is None:
-            en_iyi_secim = {
-                "brut_adet": net_adet, "fire_pct": 5.0, "fire_tabaka": 100, "montaj_adedi": 1, "tabaka_adeti": net_adet,
-                "baskiya_giren_tabaka": net_adet, "ana_ebat": "70x100 cm", "baski_ebat_str": "70x100 cm",
-                "toplam_m2": 100.0, "kg_kagit": 50.0, "kagit_maliyeti": 1000.0, "baski_maliyeti": 1000.0,
-                "toplam_uretim_maliyeti": 2500.0, "makine_kodu": "70100"
-            }
+            raise ValueError("Bu ebat ve makine sınırlarıyla uygun üretim planı bulunamadı.")
+
+        oneri = recommend(aday_sonuclari)
+        en_iyi_secim["oneriler"] = oneri
 
         return en_iyi_secim
 
@@ -409,7 +412,8 @@ elif st.session_state.page == 'calc':
         "kar_orani": kar_orani, "alternatifler": teklif_alternatifleri
     }
 
-    st.markdown("### 📊 ÜRETİM VE PLANLAMA ÖZETİ (NİHAİ MATBAA MATEMATİĞİ)")
+    st.markdown("### 📊 ÜRETİM VE PLANLAMA ÖZETİ")
+    st.warning("Montaj, düz dikdörtgen yerleşim varsayımıdır; özellikle kutu işlerinde gerçek ölçü ve bıçak çizimiyle doğrulayın. Gösterilen maliyet kâğıt ve baskıyı kapsar; kesim/selofan/diğer işlem tarifeleri bu plan hesabına henüz bağlı değildir. Bu nedenle toplam üretim maliyeti kesin teklif toplamı değildir.")
 
     def plan_kartini_yazdir(p):
         r = p['res']
@@ -478,6 +482,18 @@ elif st.session_state.page == 'calc':
             {"Parametre / Kriter": "Kaç M2", "Değer": f"{r['toplam_m2']:,.2f} m²"}
         ])
         st.table(plan_df)
+        oneriler = r.get("oneriler", {})
+        oneriler_df = pd.DataFrame([
+            {"Plan": etiket, "Tabaka": secim["ana_ebat"], "Baskı ebatı": secim["baski_ebat_str"],
+             "Montaj": secim["montaj_adedi"], "Kâğıt (kg)": round(secim["kg"], 2),
+             "Kâğıt + baskı (₺)": round(secim["total_cost"], 2)}
+            for etiket, secim in [("En düşük kâğıt + baskı", oneriler.get("lowest_total_cost")),
+                                  ("En az kâğıt", oneriler.get("lowest_paper_use")),
+                                  ("Dengeli", oneriler.get("balanced"))]
+            if secim is not None
+        ])
+        st.caption("Aşağıdaki sıralama mevcut kâğıt ve baskı girdileriyle yapılır; kesim ve sonraki işlem tarifeleri eksik olduğu için gerçek toplam maliyeti göstermez.")
+        st.dataframe(oneriler_df, use_container_width=True, hide_index=True)
 
     if ikinci_kagit_var:
         st.markdown("#### 🔹 Kağıt A Alternatifleri")
@@ -516,6 +532,7 @@ elif st.session_state.page == 'teklif':
     else:
         td = st.session_state.teklif_data
         kar_orani = td['kar_orani']
+        st.warning("Bu ekrandaki hesap kâğıt ve baskı maliyetine dayanır. Kesim, selofan ve diğer operasyon tarifeleri hesaba bağlanmadığından müşteriye gönderilecek nihai teklif olarak kullanılmadan önce bu kalemleri ekleyin.")
 
         st.markdown(
             "<div style='background-color: #f8f9fa; padding: 20px; border-radius: 10px; border-left: 5px solid #1F4E78;'>"
