@@ -14,7 +14,8 @@ helper_names = {"Rect", "Machine", "box_blank_size", "best_box_montage",
                 "bobin_cutting_allowed", "rectangular_imposition", "score_candidate", "recommend",
                 "estimate_knife_cost", "tiered_operation_cost", "press_cost_from_params",
                 "cutting_operation_cost", "layout_process_costs", "sheet_fits_limits",
-                "automatic_postpress_for_product", "included_quantity_operation_cost"}
+                "automatic_postpress_for_product", "included_quantity_operation_cost",
+                "pricing_summary"}
 helper_nodes = [node for node in app_tree.body
                 if getattr(node, "name", None) in helper_names]
 helper_namespace = {"__name__": "matbaa_helpers", "dataclass": dataclass,
@@ -36,9 +37,16 @@ press_cost_from_params = helper_namespace["press_cost_from_params"]
 layout_process_costs = helper_namespace["layout_process_costs"]
 sheet_fits_limits = helper_namespace["sheet_fits_limits"]
 automatic_postpress_for_product = helper_namespace["automatic_postpress_for_product"]
+pricing_summary = helper_namespace["pricing_summary"]
 
 
 class OptimizationTests(unittest.TestCase):
+    def test_cost_markup_reports_profit_and_gross_margin(self):
+        summary = pricing_summary(1000, 30)
+        self.assertEqual(summary["total_profit"], 300)
+        self.assertEqual(summary["total_sales"], 1300)
+        self.assertAlmostEqual(summary["gross_margin_percent"], 300 / 1300 * 100)
+
     def test_box_product_selection_automatically_sets_box_cutting_and_gluing(self):
         for product_type in ("Standart Kutu", "Dip Kilitli Kutu", "Dip Kilit Yapıştırmalı Kutu"):
             with self.subTest(product_type=product_type):
