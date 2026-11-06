@@ -30,13 +30,14 @@ class Machine:
 
 
 def box_blank_size(width_mm: float, length_mm: float, height_mm: float,
-                   style: str = "standard", row_count: int = 1) -> Rect:
+                   style: str = "standard", row_count: int = 1,
+                   column_count: int = 1) -> Rect:
     """Return the user's supplied box blank bounds; die-line still needs validation."""
-    if min(width_mm, length_mm) <= 0 or height_mm < 0 or row_count < 1:
+    if min(width_mm, length_mm) <= 0 or height_mm < 0 or row_count < 1 or column_count < 1:
         raise ValueError("Ürün ölçüleri pozitif, sıra sayısı en az 1 olmalıdır.")
-    blank_width = width_mm * 2 + height_mm * 2 + 15
+    blank_width = (width_mm * 2 + height_mm * 2 + 15) * column_count
     if style == "standard":
-        blank_height = length_mm + height_mm * 2 + 30
+        blank_height = (length_mm + height_mm + 15) * row_count + height_mm + 15
     elif style in {"dip_kilit", "dip_yapistirmali"}:
         blank_height = (length_mm + height_mm + 15 + (height_mm / 2 + 15) * 2) * row_count
         if row_count in {1, 3, 5, 6, 7, 9, 10, 11}:
@@ -44,6 +45,23 @@ def box_blank_size(width_mm: float, length_mm: float, height_mm: float,
     else:
         raise ValueError("Bilinmeyen kutu tipi.")
     return Rect(blank_width, blank_height)
+
+
+def best_box_montage(sheet: Rect, width_mm: float, length_mm: float,
+                     height_mm: float, style: str = "standard",
+                     max_rows: int = 12, max_columns: int = 4) -> dict:
+    """Search row/column groupings and both orientations for box blank yield."""
+    best = {"product_count": 0, "rows": 0, "columns": 0, "blank": None}
+    for rows in range(1, max_rows + 1):
+        for columns in range(1, max_columns + 1):
+            blank = box_blank_size(width_mm, length_mm, height_mm, style, rows, columns)
+            groups = rectangular_imposition(sheet, blank, gap_mm=0)
+            products = groups * rows * columns
+            if (products > best["product_count"] or
+                    (products == best["product_count"] and rows * columns > best["rows"] * best["columns"])):
+                best = {"product_count": products, "rows": rows,
+                        "columns": columns, "blank": blank}
+    return best
 
 
 def bobin_cutting_allowed(paper_name: str, paper_kg: float) -> bool:

@@ -5,7 +5,7 @@ import math
 import pandas as pd
 import json
 import os
-from optimization import bobin_cutting_allowed, box_blank_size, rectangular_imposition, recommend, Rect
+from optimization import best_box_montage, bobin_cutting_allowed, box_blank_size, rectangular_imposition, recommend, Rect
 
 st.set_page_config(page_title="Matbaa ve Ambalaj Maliyet & Teklif Sistemi", layout="wide")
 
@@ -241,14 +241,19 @@ elif st.session_state.page == 'calc':
         if not is_kutu:
             w_net = ebat_en + 3.0
             h_net = ebat_boy + 3.0
-            return rectangular_imposition(Rect(w_avail, h_avail), Rect(w_net, h_net))
+            blank = Rect(w_net, h_net)
+            return {"count": rectangular_imposition(Rect(w_avail, h_avail), blank),
+                    "rows": 1, "columns": 1, "blank": blank}
 
         kutu_tipi = "dip_kilit" if is_dip_kilit and urun_tipi == "Dip Kilitli Kutu" else (
             "dip_yapistirmali" if is_dip_kilit else "standard"
         )
+        if kutu_tipi == "standard":
+            return best_box_montage(Rect(w_avail, h_avail), ebat_en, ebat_boy, ebat_yuk)
         blank = box_blank_size(ebat_en, ebat_boy, ebat_yuk, kutu_tipi, sira_sayisi)
         grid_count = rectangular_imposition(Rect(w_avail, h_avail), blank)
-        return grid_count * sira_sayisi if is_dip_kilit else grid_count
+        return {"count": grid_count * sira_sayisi, "rows": sira_sayisi,
+                "columns": 1, "blank": blank}
 
     # BOBİN HASSASİYETİ (84-96 CM ENGELLENDİ, SADECE 5 CM KATLARI)
     def bobin_adaylarini_uret():
@@ -302,8 +307,11 @@ elif st.session_state.page == 'calc':
                 avail_w = tw - makas
                 avail_h = th
                 
-                montaj = akilli_montaj_hesapla(avail_w, avail_h, ebat_en, ebat_boy, ebat_yukseklik)
+                montaj_plan = akilli_montaj_hesapla(avail_w, avail_h, ebat_en, ebat_boy, ebat_yukseklik)
+                montaj = montaj_plan["count"]
                 if montaj <= 0: continue
+                blank = montaj_plan["blank"]
+                montaj_detay = f"{montaj_plan['columns']} sütun × {montaj_plan['rows']} sıra; modül {blank.width_mm:g}×{blank.height_mm:g} mm"
 
                 net_baski_tabaka = math.ceil(net_adet / montaj)
                 fire_tabaka = kademeli_fire_hesapla(net_baski_tabaka)
@@ -343,6 +351,7 @@ elif st.session_state.page == 'calc':
                     "kagit_maliyeti": kagit_maliyeti, "baski_maliyeti": baski_maliyeti,
                     "total_cost": toplam_maliyet, "makine_kodu": makine_kodu,
                     "tabaka_adeti": tabaka_adeti,
+                    "montaj_detay": montaj_detay,
                 })
                 
                 brut_adet = baskiya_giren_tabaka_adeti * montaj
@@ -352,7 +361,7 @@ elif st.session_state.page == 'calc':
                     min_maliyet = toplam_maliyet
                     en_iyi_secim = {
                         "brut_adet": brut_adet, "fire_pct": fire_pct_ortalama, "fire_tabaka": fire_tabaka,
-                        "montaj_adedi": montaj, "tabaka_adeti": tabaka_adeti, "baskiya_giren_tabaka": baskiya_giren_tabaka_adeti,
+                        "montaj_adedi": montaj, "montaj_detay": montaj_detay, "tabaka_adeti": tabaka_adeti, "baskiya_giren_tabaka": baskiya_giren_tabaka_adeti,
                         "ana_ebat": ana_tabaka, "baski_ebat_str": baski_ebat_adi, "toplam_m2": toplam_m2,
                         "kg_kagit": kg_kagit, "kagit_maliyeti": kagit_maliyeti, "baski_maliyeti": baski_maliyeti,
                         "toplam_uretim_maliyeti": toplam_maliyet, "makine_kodu": makine_kodu,
@@ -364,7 +373,7 @@ elif st.session_state.page == 'calc':
                         min_maliyet = toplam_maliyet
                         en_iyi_secim = {
                             "brut_adet": brut_adet, "fire_pct": fire_pct_ortalama, "fire_tabaka": fire_tabaka,
-                            "montaj_adedi": montaj, "tabaka_adeti": tabaka_adeti, "baskiya_giren_tabaka": baskiya_giren_tabaka_adeti,
+                            "montaj_adedi": montaj, "montaj_detay": montaj_detay, "tabaka_adeti": tabaka_adeti, "baskiya_giren_tabaka": baskiya_giren_tabaka_adeti,
                             "ana_ebat": ana_tabaka, "baski_ebat_str": baski_ebat_adi, "toplam_m2": toplam_m2,
                             "kg_kagit": kg_kagit, "kagit_maliyeti": kagit_maliyeti, "baski_maliyeti": baski_maliyeti,
                             "toplam_uretim_maliyeti": toplam_maliyet, "makine_kodu": makine_kodu,
@@ -478,7 +487,7 @@ elif st.session_state.page == 'calc':
         plan_df = pd.DataFrame([
             {"Parametre / Kriter": "Fire Tabaka / Oranı", "Değer": f"{r['fire_tabaka']} Tabaka (Ort. %{r['fire_pct']})"},
             {"Parametre / Kriter": "Brüt Ürün Adedi", "Değer": f"{r['brut_adet']:,} adet"},
-            {"Parametre / Kriter": "Montaj Planı", "Değer": f"1 Tabakada {r['montaj_adedi']} Ürün ({urun_tipi})"},
+            {"Parametre / Kriter": "Montaj Planı", "Değer": f"1 Tabakada {r['montaj_adedi']} Ürün; {r.get('montaj_detay', 'Dikdörtgen yerleşim')} ({urun_tipi})"},
             {"Parametre / Kriter": "Ana Tabaka Ebadı ve Sayısı", "Değer": f"{r['ana_ebat']} {r['tabaka_adeti']:,} Tabaka".replace(',', '.')},
             {"Parametre / Kriter": "Baskı Ebadı ve Sayısı", "Değer": baski_ebat_detay},
             {"Parametre / Kriter": "Baskıya Girecek Kağıt Ebadı ve Sayısı", "Değer": f"{r['baski_ebat_str']} {ham_tabaka:,} Tabaka".replace(',', '.')},
@@ -491,6 +500,7 @@ elif st.session_state.page == 'calc':
         oneriler = r.get("oneriler", {})
         oneriler_df = pd.DataFrame([
             {"Plan": etiket, "Tabaka": secim["ana_ebat"], "Baskı ebatı": secim["baski_ebat_str"],
+             "Montaj modülü": secim["montaj_detay"],
              "Montaj": secim["montaj_adedi"], "Kâğıt (kg)": round(secim["kg"], 2),
              "Kâğıt + baskı (₺)": round(secim["total_cost"], 2)}
             for etiket, secim in [("En düşük kâğıt + baskı", oneriler.get("lowest_total_cost")),

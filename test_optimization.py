@@ -1,6 +1,6 @@
 import unittest
 
-from optimization import Machine, Rect, bobin_cutting_allowed, box_blank_size, rectangular_imposition, recommend, score_candidate
+from optimization import Machine, Rect, best_box_montage, bobin_cutting_allowed, box_blank_size, rectangular_imposition, recommend, score_candidate
 
 
 class OptimizationTests(unittest.TestCase):
@@ -9,6 +9,13 @@ class OptimizationTests(unittest.TestCase):
 
     def test_standard_box_keeps_existing_blank_formula(self):
         self.assertEqual(box_blank_size(100, 150, 50), Rect(315, 280))
+
+    def test_standard_box_eight_up_module_matches_user_formula(self):
+        self.assertEqual(box_blank_size(100, 150, 50, "standard", 4, 2), Rect(630, 925))
+        montage = best_box_montage(Rect(685, 1000), 100, 150, 50)
+        self.assertEqual(montage["product_count"], 8)
+        self.assertEqual((montage["columns"], montage["rows"], montage["blank"]),
+                         (2, 4, Rect(630, 925)))
 
     def test_dip_lock_even_rows_use_base_formula_times_rows(self):
         self.assertEqual(box_blank_size(100, 150, 50, "dip_kilit", 2), Rect(315, 590))
