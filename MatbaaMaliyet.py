@@ -1166,15 +1166,10 @@ elif st.session_state.page == "calc":
         {"adet": net_c, "gramaj": gramaj_a, "kagit": kagit_cinsi_a, "res": res_c, "kod": "C"}
     )
 
-    st.markdown('<div class="section-kicker">06 · Fiyatlandırma</div>', unsafe_allow_html=True)
-    kar_orani = st.number_input(
-        "Hedef kâr oranı (%)",
-        min_value=0.0,
-        max_value=1000.0,
-        value=30.0,
-        step=1.0,
-        help="Teklifte kullanılacak kâr oranını yüzde olarak girin.",
-    )
+    st.markdown('<div class="section-kicker">06 · Maliyet kalemleri</div>', unsafe_allow_html=True)
+    # Read the last entered margin before calculating; its editable field is shown
+    # below the cost breakdown so the user can review costs first.
+    kar_orani = float(st.session_state.get("hedef_kar_orani", 30.0))
     st.markdown("#### A/B/C için işletme giderleri (TL / iş)")
     st.caption(
         "Mücellit, nakliye ve tanımlı olmayan ekstra gider tarifeleri verilmediği için "
@@ -1557,7 +1552,8 @@ elif st.session_state.page == "calc":
                 value = by_code.get(code, {}).get(name, 0.0)
                 row[code] = f"%{value:g}" if name == "Kar Oranı" else f"₺{value:,.2f}"
             rows.append(row)
-        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+        # st.table renders every cost row without an inner scrolling area.
+        st.table(pd.DataFrame(rows))
 
     st.markdown("### 💰 Üretim Maliyeti ve Satış Özeti")
     st.caption(
@@ -1578,6 +1574,21 @@ elif st.session_state.page == "calc":
 
     maliyet_dokumu_yazdir(teklif_alternatifleri, f"Kâğıt ({kagit_cinsi_a})")
     st.caption("Teklif tutarları KDV hariçtir; KDV ayrıca eklenecektir.")
+
+    st.markdown('<div class="section-kicker">07 · Kâr ve satış fiyatı</div>', unsafe_allow_html=True)
+    st.caption(
+        "Maliyet kalemlerini inceledikten sonra hedef kâr oranını belirleyin. "
+        "Değişiklik toplam ve birim satış fiyatlarını yeniden hesaplar."
+    )
+    st.number_input(
+        "Hedef kâr oranı (%)",
+        min_value=0.0,
+        max_value=1000.0,
+        value=kar_orani,
+        step=1.0,
+        key="hedef_kar_orani",
+        help="Teklifte kullanılacak kâr oranını yüzde olarak girin.",
+    )
 
     st.markdown("---")
     if st.button(
