@@ -12,7 +12,8 @@ app_source = Path(__file__).with_name("MatbaaMaliyet.py").read_text(encoding="ut
 app_tree = ast.parse(app_source)
 helper_names = {"Rect", "Machine", "box_blank_size", "best_box_montage",
                 "bobin_cutting_allowed", "rectangular_imposition", "score_candidate", "recommend",
-                "estimate_knife_cost", "tiered_operation_cost", "press_cost_from_params"}
+                "estimate_knife_cost", "tiered_operation_cost", "press_cost_from_params",
+                "cutting_operation_cost", "sheet_fits_limits"}
 helper_nodes = [node for node in app_tree.body
                 if getattr(node, "name", None) in helper_names]
 helper_namespace = {"__name__": "matbaa_helpers", "dataclass": dataclass,
@@ -28,7 +29,9 @@ recommend = helper_namespace["recommend"]
 score_candidate = helper_namespace["score_candidate"]
 estimate_knife_cost = helper_namespace["estimate_knife_cost"]
 tiered_operation_cost = helper_namespace["tiered_operation_cost"]
+cutting_operation_cost = helper_namespace["cutting_operation_cost"]
 press_cost_from_params = helper_namespace["press_cost_from_params"]
+sheet_fits_limits = helper_namespace["sheet_fits_limits"]
 
 
 class OptimizationTests(unittest.TestCase):
@@ -93,14 +96,25 @@ class OptimizationTests(unittest.TestCase):
     def test_tiered_operation_cost_adds_each_setup_tier_and_run(self):
         self.assertEqual(tiered_operation_cost(1500, 1000, 1800, 0.75), 4725)
 
-    def test_press_cost_includes_selected_pantone_units_and_omits_disabled_cmyk(self):
+    def test_k_bobts_charges_sheet_tariff_only_after_first_thousand(self):
+        self.assertEqual(cutting_operation_cost(1000, 1000, 1800, 0.75), 1800)
+        self.assertEqual(cutting_operation_cost(1500, 1000, 1800, 0.75), 2175)
+        self.assertEqual(cutting_operation_cost(0, 1000, 1800, 0.75), 0)
+
+    def test_press_tirage_is_priced_per_1000_finished_products(self):
         params = {
             "b_3550_cmyk": 1800,
             "b_3550_pantone": 900,
             "b_3550_tiraj": 400,
         }
-        self.assertEqual(press_cost_from_params(params, "3550", 3000, True, 2), 4800)
+        self.assertEqual(press_cost_from_params(params, "3550", 1500, True, 2), 4200)
         self.assertEqual(press_cost_from_params(params, "3550", 3000, False, 0), 0)
+
+    def test_cutting_machine_size_limits_allow_rotation(self):
+        self.assertTrue(sheet_fits_limits(500, 700, 500, 700))
+        self.assertTrue(sheet_fits_limits(700, 500, 500, 700))
+        self.assertFalse(sheet_fits_limits(700, 1000, 500, 700))
+        self.assertTrue(sheet_fits_limits(700, 1000, 700, 1000))
 
 
 if __name__ == "__main__":

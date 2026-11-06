@@ -124,6 +124,14 @@ def rectangular_imposition(sheet: Rect, product: Rect, gap_mm: float = 3.0) -> i
     )
 
 
+def sheet_fits_limits(width_mm: float, height_mm: float, max_width_mm: float, max_height_mm: float) -> bool:
+    """Check a sheet against a machine limit, allowing 90-degree rotation."""
+    return (
+        (width_mm <= max_width_mm and height_mm <= max_height_mm)
+        or (height_mm <= max_width_mm and width_mm <= max_height_mm)
+    )
+
+
 def score_candidate(
     *,
     stock: Rect,
@@ -167,7 +175,7 @@ def score_candidate(
     ):
         press_cost = cutter_cost = total = None
     else:
-        press_cost = press.setup_cost + max(0, press_sheets - 2000) / 1000 * press.run_cost_per_1000
+        press_cost = press.setup_cost + quantity / 1000 * press.run_cost_per_1000
         cutter_cost = cutter.setup_cost + stock_sheets / 1000 * cutter.run_cost_per_1000
         total = paper_cost + press_cost + cutter_cost
 
@@ -244,23 +252,32 @@ def tiered_operation_cost(
     return ceil(quantity / tier_size) * setup_cost + quantity * unit_cost
 
 
+def cutting_operation_cost(quantity: int, included_sheets: int, setup_cost: float, excess_sheet_cost: float) -> float:
+    """Charge one cutting setup, then price only sheets above the included amount."""
+    if quantity < 0 or included_sheets <= 0 or min(setup_cost, excess_sheet_cost) < 0:
+        raise ValueError("Tabaka adedi, sınır ve kesim tarifeleri geçerli olmalıdır.")
+    if quantity == 0:
+        return 0.0
+    return setup_cost + max(0, quantity - included_sheets) * excess_sheet_cost
+
+
 def press_cost_from_params(
     params: dict,
     machine_code: str,
-    sheet_count: int,
+    quantity: int,
     cmyk_enabled: bool,
     pantone_colors: int = 0,
-    setup_limit: int = 2000,
 ) -> float:
-    """Calculate CMYK/Pantone setup and run cost for a press sheet count."""
-    if sheet_count < 0 or pantone_colors < 0 or setup_limit <= 0:
-        raise ValueError("Baskı adedi, renk sayısı ve hazırlık sınırı geçerli olmalıdır.")
+    """Add setup charges and tirage priced per 1,000 finished products."""
+    if quantity < 0 or pantone_colors < 0:
+        raise ValueError("Baskı adedi ve renk sayısı geçerli olmalıdır.")
+    if quantity == 0:
+        return 0.0
     cmyk_setup = params.get(f"b_{machine_code}_cmyk", 0.0) if cmyk_enabled else 0.0
     pantone_setup = pantone_colors * params.get(f"b_{machine_code}_pantone", 0.0)
-    print_units = int(cmyk_enabled) + pantone_colors
-    extra_sheets = max(0, sheet_count - setup_limit)
     run_rate = params.get(f"b_{machine_code}_tiraj", 0.0)
-    return cmyk_setup + pantone_setup + extra_sheets / 1000 * run_rate * print_units
+    run_cost = quantity / 1000 * run_rate if cmyk_enabled or pantone_colors else 0.0
+    return cmyk_setup + pantone_setup + run_cost
 
 
 st.set_page_config(
@@ -301,10 +318,10 @@ default_params = {
     "kab_70100_tiraj": 1.9,
     "kazanli": 1800.0,
     "kazanli_tiraj": 0.75,
-    "pedal": 2500.0,
-    "pedal_tiraj": 1.0,
+    "pedal": 1800.0,
+    "pedal_tiraj": 0.75,
     "bobst": 3000.0,
-    "bobst_tiraj": 1.5,
+    "bobst_tiraj": 1.0,
     "omega_tek": 2000.0,
     "omega_tek_tiraj": 0.2,
     "omega_dip": 2500.0,
@@ -325,6 +342,9 @@ def parametreleri_yukle():
                     "b_3550_cmyk": (2400.0, 1800.0),
                     "b_3550_pantone": (1200.0, 900.0),
                     "b_3550_tiraj": (500.0, 400.0),
+                    "bobst_tiraj": (1.5, 1.0),
+                    "pedal": (2500.0, 1800.0),
+                    "pedal_tiraj": (1.0, 0.75),
                 }
                 for key, (eski, yeni) in eski_tarifeler.items():
                     if kayitli.get(key) == eski:
@@ -348,11 +368,11 @@ if "params" not in st.session_state:
     st.session_state.params = parametreleri_yukle()
 
 
-# --- 1. TCMB ANLIK EFEKTİF SATIŞ KURLARINI ÇEKME ---
+# --- 1. TCMB GÜNCEL SATIŞ KURLARINI ÇEKME ---
 @st.cache_data(ttl=3600)
 def tcmb_kurlarini_getir():
-    usd_kur = 49.97
-    eur_kur = 56.00
+    usd_kur = None
+    eur_kur = None
 
     try:
         url = "https://www.tcmb.gov.tr/kurlar/today.xml"
@@ -362,11 +382,13 @@ def tcmb_kurlarini_getir():
         for currency in root.findall("Currency"):
             code = currency.get("CurrencyCode")
             if code == "USD":
-                val = currency.find("BanknoteSelling").text
+                node = currency.find("BanknoteSelling")
+                val = node.text if node is not None else None
                 if val:
                     usd_kur = float(val)
             elif code == "EUR":
-                val = currency.find("BanknoteSelling").text
+                node = currency.find("BanknoteSelling")
+                val = node.text if node is not None else None
                 if val:
                     eur_kur = float(val)
     except Exception:
@@ -391,9 +413,12 @@ def go_page(page_name):
 
 # --- 3. ÜST GEZİNTİ VE NAVİGASYON BARI ---
 st.markdown("## 🖨️ MATBAAM PRO - Ambalaj & Matbaa Maliyet ve Teklif Sistemi")
-st.info(
-    f"🏦 TCMB Anlık Efektif Satış Kurları — USD: ₺{canli_usd:.2f} | EUR: ₺{canli_eur:.2f}"
-)
+if canli_usd is not None and canli_eur is not None:
+    st.info(
+        f"🏦 TCMB güncel döviz satış kurları — USD: ₺{canli_usd:.4f} | EUR: ₺{canli_eur:.4f}"
+    )
+else:
+    st.error("TCMB döviz kurları şu anda alınamadı; dövize bağlı kâğıt maliyetleri hesaplanamaz.")
 
 nav_c1, nav_c2, nav_c3, nav_c4 = st.columns(4)
 with nav_c1:
@@ -459,6 +484,7 @@ if st.session_state.page == "home":
 # ==========================================
 elif st.session_state.page == 'params':
     st.subheader("Matbaa Maliyet Parametreleri Fiyat Listesi")
+    st.caption("Girilen işletme tarifeleri KDV hariçtir. Tekliflerde KDV ayrıca belirtilir ve eklenir.")
     col1, col2 = st.columns(2)
     with col1:
         st.markdown("#### 1. Kağıt ve Karton Grubu (Ton Maliyetleri)")
@@ -469,14 +495,14 @@ elif st.session_state.page == 'params':
 
         st.markdown("---")
         st.markdown("#### 2. Baskı Grubu (TL)")
-        st.session_state.params['b_3550_cmyk'] = st.number_input("35×50 CMYK — baskı/proses (2.000 tabaka sınırı, ₺)", value=float(st.session_state.params['b_3550_cmyk']))
-        st.session_state.params['b_3550_pantone'] = st.number_input("35×50 Pantone 1 renk — proses (2.000 tabaka sınırı, ₺)", value=float(st.session_state.params['b_3550_pantone']))
+        st.session_state.params['b_3550_cmyk'] = st.number_input("35×50 CMYK — hazırlık/proses (iş başına, ₺)", value=float(st.session_state.params['b_3550_cmyk']))
+        st.session_state.params['b_3550_pantone'] = st.number_input("35×50 Pantone 1 renk — hazırlık/proses (renk başına, ₺)", value=float(st.session_state.params['b_3550_pantone']))
         st.session_state.params['b_3550_tiraj'] = st.number_input("35×50 tiraj (1.000 adet başına, ₺)", value=float(st.session_state.params['b_3550_tiraj']))
-        st.session_state.params['b_5070_cmyk'] = st.number_input("50×70 CMYK — baskı/proses (2.000 tabaka sınırı, ₺)", value=float(st.session_state.params['b_5070_cmyk']))
-        st.session_state.params['b_5070_pantone'] = st.number_input("50×70 Pantone 1 renk — proses (2.000 tabaka sınırı, ₺)", value=float(st.session_state.params['b_5070_pantone']))
+        st.session_state.params['b_5070_cmyk'] = st.number_input("50×70 CMYK — hazırlık/proses (iş başına, ₺)", value=float(st.session_state.params['b_5070_cmyk']))
+        st.session_state.params['b_5070_pantone'] = st.number_input("50×70 Pantone 1 renk — hazırlık/proses (renk başına, ₺)", value=float(st.session_state.params['b_5070_pantone']))
         st.session_state.params['b_5070_tiraj'] = st.number_input("50×70 tiraj (1.000 adet başına, ₺)", value=float(st.session_state.params['b_5070_tiraj']))
-        st.session_state.params['b_70100_cmyk'] = st.number_input("70×100 CMYK — baskı/proses (2.000 tabaka sınırı, ₺)", value=float(st.session_state.params['b_70100_cmyk']))
-        st.session_state.params['b_70100_pantone'] = st.number_input("70×100 Pantone 1 renk — proses (2.000 tabaka sınırı, ₺)", value=float(st.session_state.params['b_70100_pantone']))
+        st.session_state.params['b_70100_cmyk'] = st.number_input("70×100 CMYK — hazırlık/proses (iş başına, ₺)", value=float(st.session_state.params['b_70100_cmyk']))
+        st.session_state.params['b_70100_pantone'] = st.number_input("70×100 Pantone 1 renk — hazırlık/proses (renk başına, ₺)", value=float(st.session_state.params['b_70100_pantone']))
         st.session_state.params['b_70100_tiraj'] = st.number_input("70×100 tiraj (1.000 adet başına, ₺)", value=float(st.session_state.params['b_70100_tiraj']))
     with col2:
         st.markdown("#### 3. Yüzey İşlemleri ve Lak Grubu")
@@ -500,8 +526,8 @@ elif st.session_state.page == 'params':
     with cut_col1:
         st.session_state.params['kazanli'] = st.number_input("Kazanlı kesim (1.000 adet sınırı, çember başına ₺)", value=float(st.session_state.params['kazanli']))
         st.session_state.params['kazanli_tiraj'] = st.number_input("Kazanlı kesim tiraj (adet başına, ₺)", value=float(st.session_state.params['kazanli_tiraj']))
-        st.session_state.params['pedal'] = st.number_input("Pedal kesim (1.000 adet sınırı, çember başına ₺)", value=float(st.session_state.params['pedal']))
-        st.session_state.params['pedal_tiraj'] = st.number_input("Pedal kesim tiraj (adet başına, ₺)", value=float(st.session_state.params['pedal_tiraj']))
+        st.session_state.params['pedal'] = st.number_input("K. Bobts (60×80 cm; ilk 1.000 tabaka çember başına ₺)", value=float(st.session_state.params['pedal']))
+        st.session_state.params['pedal_tiraj'] = st.number_input("K. Bobts tirajı (1.000 tabakadan sonra, tabaka başına ₺)", value=float(st.session_state.params['pedal_tiraj']))
         st.session_state.params['bobst'] = st.number_input("Bobst kesim (1.000 adet sınırı, çember başına ₺)", value=float(st.session_state.params['bobst']))
         st.session_state.params['bobst_tiraj'] = st.number_input("Bobst kesim tiraj (adet başına, ₺)", value=float(st.session_state.params['bobst_tiraj']))
     with cut_col2:
@@ -559,34 +585,16 @@ elif st.session_state.page == "calc":
     with col_r2_3:
         net_c = st.number_input("Ürün Adedi C", value=25000, min_value=1, step=100)
 
-    col_ka_head, col_kb_head = st.columns(2)
+    col_ka_head, _ = st.columns(2)
     with col_ka_head:
         ca_g, ca_c = st.columns(2)
         with ca_g:
-            gramaj_a = st.number_input("Gramaj A (gr/m²)", value=350, step=10, min_value=50)
+            gramaj_a = st.number_input("Gramaj (gr/m²)", value=350, step=10, min_value=50)
         with ca_c:
             kagit_cinsi_a = st.selectbox(
-                "Kağıt Cinsi A",
+                "Kağıt Cinsi",
                 ["Amerikan Bristol", "Krome Karton", "Kuşe Kağıt", "1. Hamur Kağıt"],
             )
-
-    with col_kb_head:
-        cb_g, cb_c = st.columns(2)
-        with cb_g:
-            gramaj_b = st.number_input("Gramaj B (Opsiyonel)", value=400, step=10, min_value=50)
-        with cb_c:
-            kagit_cinsi_b = st.selectbox(
-                "Kağıt Cinsi B",
-                [
-                    "Yok / Kullanma",
-                    "Amerikan Bristol",
-                    "Krome Karton",
-                    "Kuşe Kağıt",
-                    "1. Hamur Kağıt",
-                ],
-            )
-
-    ikinci_kagit_var = kagit_cinsi_b != "Yok / Kullanma"
 
     col_ebat1, col_ebat2, col_ebat3, col_baski1, col_baski2 = st.columns(5)
     with col_ebat1:
@@ -629,12 +637,12 @@ elif st.session_state.page == "calc":
     with c_ob1:
         ozel_baski_1 = st.selectbox(
             "Özel Baskılar 1",
-            ["Yok", "Lokal Lak", "Kabartma Lak", "Varak Yaldız"],
+            ["Yok", "Dispresiyon Lak", "Lokal Lak", "Kabartma Lak", "Varak Yaldız"],
         )
     with c_ob2:
         ozel_baski_2 = st.selectbox(
             "Özel Baskılar 2",
-            ["Yok", "Lokal Lak", "Kabartma Lak", "Varak Yaldız"],
+            ["Yok", "Dispresiyon Lak", "Lokal Lak", "Kabartma Lak", "Varak Yaldız"],
         )
     with c_bs:
         baski_sonrasi = st.selectbox(
@@ -644,9 +652,9 @@ elif st.session_state.page == "calc":
 
     kesim_makinesi = st.selectbox(
         "Kesim makinesi tarifesi",
-        ["Kazanlı Kesim", "Pedal Kesim", "Bobst Kesim"],
-        help="Kesim makinesi kapasite sınırları işletme verisi olarak ayrıca doğrulanmalıdır.",
+        ["Kazanlı Kesim", "K. Bobts", "Bobst Kesim"],
     )
+    st.caption("Kazanlı maksimum ebat: 50×70 cm. K. Bobts maksimum ebat: 60×80 cm. Bobst maksimum ebat: 70×100 cm.")
 
     ozel_istekler = st.text_input(
         "Özel İstekler",
@@ -868,6 +876,14 @@ elif st.session_state.page == "calc":
                 makas,
                 bolunme_orani,
             ) in aday_listesi:
+                cutter_max = {
+                    "Kazanlı Kesim": (500.0, 700.0),
+                    "K. Bobts": (600.0, 800.0),
+                    "Bobst Kesim": (700.0, 1000.0),
+                }.get(kesim_makinesi)
+                if cutter_max and not sheet_fits_limits(tw, th, *cutter_max):
+                    continue
+
                 avail_w = tw - makas
                 avail_h = th
 
@@ -904,12 +920,21 @@ elif st.session_state.page == "calc":
                 kg_kagit = round((toplam_m2 * gramaj) / 1000.0, 2)
 
                 if kagit == "Amerikan Bristol":
+                    if canli_usd is None:
+                        st.error("Amerikan Bristol maliyeti için TCMB USD kuru alınamadı.")
+                        st.stop()
                     ton_fiyat = params["bristol"] * canli_usd
                 elif kagit == "Krome Karton":
                     ton_fiyat = params["krome"]
                 elif kagit == "Kuşe Kağıt":
+                    if canli_eur is None:
+                        st.error("Kuşe kâğıt maliyeti için TCMB EUR kuru alınamadı.")
+                        st.stop()
                     ton_fiyat = params["kuse"] * canli_eur
                 else:
+                    if canli_usd is None:
+                        st.error("1. Hamur maliyeti için TCMB USD kuru alınamadı.")
+                        st.stop()
                     ton_fiyat = params["hamur"] * canli_usd
 
                 kagit_maliyeti = (kg_kagit / 1000.0) * ton_fiyat
@@ -923,7 +948,7 @@ elif st.session_state.page == "calc":
                 baski_maliyeti = press_cost_from_params(
                     params,
                     makine_kodu,
-                    baskiya_giren_tabaka_adeti,
+                    net_adet,
                     cmyk_enabled,
                     pantone_colors,
                 )
@@ -1005,7 +1030,7 @@ elif st.session_state.page == "calc":
 
         if en_iyi_secim is None:
             raise ValueError(
-                "Bu ebat ve makine sınırlarıyla uygun üretim planı bulunamadı."
+                f"{kesim_makinesi} sınırlarına uygun üretim planı bulunamadı."
             )
 
         en_iyi_secim["oneriler"] = recommend(aday_sonuclari)
@@ -1025,21 +1050,6 @@ elif st.session_state.page == "calc":
     plan_params.append(
         {"adet": net_c, "gramaj": gramaj_a, "kagit": kagit_cinsi_a, "res": res_c, "kod": "C"}
     )
-
-    if ikinci_kagit_var:
-        res_a2 = icsel_planla_ve_hesapla(net_a, gramaj_b, kagit_cinsi_b)
-        res_b2 = icsel_planla_ve_hesapla(net_b, gramaj_b, kagit_cinsi_b)
-        res_c2 = icsel_planla_ve_hesapla(net_c, gramaj_b, kagit_cinsi_b)
-
-        plan_params.append(
-            {"adet": net_a, "gramaj": gramaj_b, "kagit": kagit_cinsi_b, "res": res_a2, "kod": "A2"}
-        )
-        plan_params.append(
-            {"adet": net_b, "gramaj": gramaj_b, "kagit": kagit_cinsi_b, "res": res_b2, "kod": "B2"}
-        )
-        plan_params.append(
-            {"adet": net_c, "gramaj": gramaj_b, "kagit": kagit_cinsi_b, "res": res_c2, "kod": "C2"}
-        )
 
     kar_orani = st.slider("Hedef Kar Marjı (%)", 0, 100, 30)
     st.markdown("#### A/B/C için işletme giderleri (TL / iş)")
@@ -1071,7 +1081,7 @@ elif st.session_state.page == "calc":
 
     kesim_tarifeleri = {
         "Kazanlı Kesim": ("kazanli", "kazanli_tiraj"),
-        "Pedal Kesim": ("pedal", "pedal_tiraj"),
+        "K. Bobts": ("pedal", "pedal_tiraj"),
         "Bobst Kesim": ("bobst", "bobst_tiraj"),
     }
     setup_key, unit_key = kesim_tarifeleri[kesim_makinesi]
@@ -1093,7 +1103,7 @@ elif st.session_state.page == "calc":
         print_cost = press_cost_from_params(
             st.session_state.params,
             press_code,
-            press_sheets,
+            quantity,
             cmyk_secim != "CMYK Baskı yok",
             pantone_colors,
         )
@@ -1109,12 +1119,19 @@ elif st.session_state.page == "calc":
             else 0.0
         )
 
-        cutting_cost = tiered_operation_cost(
-            quantity,
-            1000,
-            st.session_state.params[setup_key],
-            st.session_state.params[unit_key],
-        )
+        if kesim_makinesi == "K. Bobts":
+            cutting_cost = cutting_operation_cost(
+                quantity, 1000,
+                st.session_state.params[setup_key],
+                st.session_state.params[unit_key],
+            )
+        else:
+            cutting_cost = tiered_operation_cost(
+                quantity,
+                1000,
+                st.session_state.params[setup_key],
+                st.session_state.params[unit_key],
+            )
 
         is_box_plan = "Kutu" in urun_tipi
         glue_cost = 0.0
@@ -1148,14 +1165,23 @@ elif st.session_state.page == "calc":
         lacquer_cost = 0.0
         lacquer_size = {"5070": "5070", "70100": "70100"}.get(press_code)
         for finish in [ozel_baski_1, ozel_baski_2]:
-            if finish not in {"Lokal Lak", "Kabartma Lak"} or not lacquer_size:
+            if finish not in {"Dispresiyon Lak", "Lokal Lak", "Kabartma Lak"} or not lacquer_size:
                 continue
-            prefix = "lokal" if finish == "Lokal Lak" else "kab"
-            lacquer_cost += (
-                math.ceil(press_sheets / 1000)
-                * st.session_state.params[f"{prefix}_{lacquer_size}"]
-                + quantity * st.session_state.params[f"{prefix}_{lacquer_size}_tiraj"]
-            )
+            if finish == "Dispresiyon Lak":
+                disp_limit = 1000 if lacquer_size == "5070" else 2000
+                lacquer_cost += (
+                    math.ceil(press_sheets / disp_limit)
+                    * st.session_state.params[f"disp_{lacquer_size}"]
+                    + quantity / 1000
+                    * st.session_state.params[f"disp_{lacquer_size}_tiraj"]
+                )
+            else:
+                prefix = "lokal" if finish == "Lokal Lak" else "kab"
+                lacquer_cost += (
+                    math.ceil(press_sheets / 1000)
+                    * st.session_state.params[f"{prefix}_{lacquer_size}"]
+                    + quantity * st.session_state.params[f"{prefix}_{lacquer_size}_tiraj"]
+                )
 
         manual = ek_giderler[code]
         breakdown = {
@@ -1378,44 +1404,11 @@ elif st.session_state.page == "calc":
         )
         st.dataframe(oneriler_df, use_container_width=True, hide_index=True)
 
-    if ikinci_kagit_var:
-        st.markdown("#### 🔹 Kağıt A Alternatifleri")
-        col_p1, col_p2, col_p3 = st.columns(3)
-
-        with col_p1:
-            st.markdown("##### Alternatif A")
-            plan_kartini_yazdir(teklif_alternatifleri[0])
-        with col_p2:
-            st.markdown("##### Alternatif B")
-            plan_kartini_yazdir(teklif_alternatifleri[1])
-        with col_p3:
-            st.markdown("##### Alternatif C")
-            plan_kartini_yazdir(teklif_alternatifleri[2])
-
-        st.markdown("#### 🔹 Kağıt B Alternatifleri")
-        col_p4, col_p5, col_p6 = st.columns(3)
-
-        with col_p4:
-            st.markdown("##### Alternatif A2")
-            plan_kartini_yazdir(teklif_alternatifleri[3])
-        with col_p5:
-            st.markdown("##### Alternatif B2")
-            plan_kartini_yazdir(teklif_alternatifleri[4])
-        with col_p6:
-            st.markdown("##### Alternatif C2")
-            plan_kartini_yazdir(teklif_alternatifleri[5])
-    else:
-        col_p1, col_p2, col_p3 = st.columns(3)
-
-        with col_p1:
-            st.markdown("##### Alternatif A")
-            plan_kartini_yazdir(teklif_alternatifleri[0])
-        with col_p2:
-            st.markdown("##### Alternatif B")
-            plan_kartini_yazdir(teklif_alternatifleri[1])
-        with col_p3:
-            st.markdown("##### Alternatif C")
-            plan_kartini_yazdir(teklif_alternatifleri[2])
+    plan_cols = st.columns(3)
+    for col, plan, label in zip(plan_cols, teklif_alternatifleri, ["A", "B", "C"]):
+        with col:
+            st.markdown(f"##### Alternatif {label}")
+            plan_kartini_yazdir(plan)
 
     def maliyet_dokumu_yazdir(plans, title, suffix=""):
         st.markdown(f"#### {title} — Maliyet Dökümü")
@@ -1449,21 +1442,18 @@ elif st.session_state.page == "calc":
         "500 TL/metre tarifesine çevrilir. Bıçak tutarı iş başına bir defa eklenir."
     )
     if any(
-        finish in {"Lokal Lak", "Kabartma Lak"}
+        finish in {"Dispresiyon Lak", "Lokal Lak", "Kabartma Lak"}
         and plan["res"]["makine_kodu"] == "3550"
         for finish in [ozel_baski_1, ozel_baski_2]
         for plan in teklif_alternatifleri
     ):
         st.info(
-            "35×50 için lokal/kabartma lak tarifesi parametrelerde yok; bu kalemi "
+            "35×50 için lak tarifesi parametrelerde yok; bu kalemi "
             "Ekstra Giderler alanına elle ekleyin. Varak fiyatı da ayrıca girilmelidir."
         )
 
-    maliyet_dokumu_yazdir(teklif_alternatifleri, f"Kağıt A ({kagit_cinsi_a})")
-    if ikinci_kagit_var:
-        maliyet_dokumu_yazdir(
-            teklif_alternatifleri, f"Kağıt B ({kagit_cinsi_b})", suffix="2"
-        )
+    maliyet_dokumu_yazdir(teklif_alternatifleri, f"Kâğıt ({kagit_cinsi_a})")
+    st.caption("Teklif tutarları KDV hariçtir; KDV ayrıca eklenecektir.")
 
     st.markdown("---")
     if st.button(
@@ -1493,7 +1483,7 @@ elif st.session_state.page == "teklif":
         st.warning(
             "Teklif toplamına kâğıt, baskı, laminasyon, seçilen kesim ve kutu yapıştırma "
             "tarifeleri ile girilen mücellit/nakliye/ekstra giderler eklenmiştir. Bıçak "
-            "uzunluğu tahminidir; gerçek kalıp çizimiyle doğrulayın."
+            "uzunluğu tahminidir; gerçek kalıp çizimiyle doğrulayın. Tüm fiyatlar KDV hariçtir; KDV ayrıca eklenir."
         )
 
         st.markdown(
