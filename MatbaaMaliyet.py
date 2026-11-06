@@ -280,6 +280,16 @@ def press_cost_from_params(
     return cmyk_setup + pantone_setup + run_cost
 
 
+def automatic_postpress_for_product(product_type: str) -> str | None:
+    """Return the required finishing operation for box products."""
+    box_types = {
+        "Standart Kutu",
+        "Dip Kilitli Kutu",
+        "Dip Kilit Yapıştırmalı Kutu",
+    }
+    return "Kutu Kesim + Yapıştırma" if product_type in box_types else None
+
+
 def layout_process_costs(
     params: dict,
     press_code: str,
@@ -297,6 +307,7 @@ def layout_process_costs(
     special_cut: bool,
     postpress: str,
     total_area_m2: float,
+    products_per_sheet: int = 1,
 ) -> dict:
     """Price one imposition using the same printed-sheet count for press and cutting."""
     press_cost = press_cost_from_params(
@@ -309,14 +320,9 @@ def layout_process_costs(
         "Bobst Kesim": ("bobst", "bobst_tiraj"),
     }
     setup_key, tirage_key = cutter_keys[cutting_machine]
-    if cutting_machine == "K. Bobts":
-        cutting_cost = cutting_operation_cost(
-            sheet_quantity, 1000, params[setup_key], params[tirage_key]
-        )
-    else:
-        cutting_cost = tiered_operation_cost(
-            sheet_quantity, 1000, params[setup_key], params[tirage_key]
-        )
+    cutting_cost = cutting_operation_cost(
+        sheet_quantity, 1000, params[setup_key], params[tirage_key]
+    )
 
     lamination_key = {
         "Mat Selofan": "mat_sel",
@@ -331,7 +337,7 @@ def layout_process_costs(
             product_length_mm,
             params["bicak_metre_fiyati"],
             is_box=is_box,
-        )
+        ) * max(1, products_per_sheet)
 
     glue_cost = 0.0
     if postpress == "Kutu Kesim + Yapıştırma" and is_box:
@@ -850,10 +856,15 @@ elif st.session_state.page == "calc":
             ["Yok", "Dispresiyon Lak", "Lokal Lak", "Kabartma Lak", "Varak Yaldız"],
         )
     with c_bs:
-        baski_sonrasi = st.selectbox(
-            "Baskı Sonrası",
-            ["Düz Kesim", "Özel kesim", "Kutu Kesim + Yapıştırma"],
-        )
+        otomatik_son_islem = automatic_postpress_for_product(urun_tipi)
+        if otomatik_son_islem:
+            baski_sonrasi = otomatik_son_islem
+            st.info(f"Otomatik işlem: **{baski_sonrasi}**")
+        else:
+            baski_sonrasi = st.selectbox(
+                "Baskı Sonrası",
+                ["Düz Kesim", "Özel kesim"],
+            )
 
     st.markdown('<div class="section-kicker">05 · Kesim ve özel istekler</div>', unsafe_allow_html=True)
     kesim_makinesi = st.selectbox(
@@ -1168,6 +1179,7 @@ elif st.session_state.page == "calc":
                     special_cut=baski_sonrasi == "Özel kesim",
                     postpress=baski_sonrasi,
                     total_area_m2=toplam_m2,
+                    products_per_sheet=montaj,
                 )
                 baski_maliyeti = process_costs["Baskı"]
                 kesim_maliyeti = process_costs["Kesim"]
@@ -1338,6 +1350,7 @@ elif st.session_state.page == "calc":
             special_cut=baski_sonrasi == "Özel kesim",
             postpress=baski_sonrasi,
             total_area_m2=r["toplam_m2"],
+            products_per_sheet=r["montaj_adedi"],
         )
         paper_cost = r["kagit_maliyeti"]
         print_cost = process_costs["Baskı"]

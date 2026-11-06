@@ -13,7 +13,8 @@ app_tree = ast.parse(app_source)
 helper_names = {"Rect", "Machine", "box_blank_size", "best_box_montage",
                 "bobin_cutting_allowed", "rectangular_imposition", "score_candidate", "recommend",
                 "estimate_knife_cost", "tiered_operation_cost", "press_cost_from_params",
-                "cutting_operation_cost", "layout_process_costs", "sheet_fits_limits"}
+                "cutting_operation_cost", "layout_process_costs", "sheet_fits_limits",
+                "automatic_postpress_for_product"}
 helper_nodes = [node for node in app_tree.body
                 if getattr(node, "name", None) in helper_names]
 helper_namespace = {"__name__": "matbaa_helpers", "dataclass": dataclass,
@@ -33,9 +34,50 @@ cutting_operation_cost = helper_namespace["cutting_operation_cost"]
 press_cost_from_params = helper_namespace["press_cost_from_params"]
 layout_process_costs = helper_namespace["layout_process_costs"]
 sheet_fits_limits = helper_namespace["sheet_fits_limits"]
+automatic_postpress_for_product = helper_namespace["automatic_postpress_for_product"]
 
 
 class OptimizationTests(unittest.TestCase):
+    def test_box_product_selection_automatically_sets_box_cutting_and_gluing(self):
+        for product_type in ("Standart Kutu", "Dip Kilitli Kutu", "Dip Kilit Yapıştırmalı Kutu"):
+            with self.subTest(product_type=product_type):
+                self.assertEqual(
+                    automatic_postpress_for_product(product_type),
+                    "Kutu Kesim + Yapıştırma",
+                )
+        self.assertIsNone(automatic_postpress_for_product("Kartonet"))
+
+    def test_standard_and_dip_lock_boxes_use_same_default_gluing_tariff(self):
+        params = {
+            "b_3550_cmyk": 1800, "b_3550_pantone": 900, "b_3550_tiraj": 400,
+            "kazanli": 1800, "kazanli_tiraj": 0.75,
+            "bicak_metre_fiyati": 500,
+            "omega_tek": 2000, "omega_tek_tiraj": 0.2,
+            "omega_dip": 2500, "omega_dip_tiraj": 0.25,
+        }
+        glue_costs = []
+        for product_type in ("Standart Kutu", "Dip Kilitli Kutu"):
+            costs = layout_process_costs(
+                params=params,
+                press_code="3550",
+                sheet_quantity=1000,
+                order_quantity=5000,
+                cutting_machine="Kazanlı Kesim",
+                cmyk_enabled=True,
+                pantone_colors=0,
+                lamination="Yok",
+                special_finishes=[],
+                product_width_mm=100,
+                product_length_mm=150,
+                is_box=True,
+                is_dip_glued=False,
+                special_cut=False,
+                postpress=automatic_postpress_for_product(product_type),
+                total_area_m2=1.0,
+            )
+            glue_costs.append(costs["Yapıştırma"])
+        self.assertEqual(glue_costs, [3000, 3000])
+
     def test_grid_yield_checks_both_orientations_without_multiplier(self):
         self.assertEqual(rectangular_imposition(Rect(700, 1000), Rect(333, 350)), 4)
 
@@ -102,6 +144,12 @@ class OptimizationTests(unittest.TestCase):
         self.assertEqual(cutting_operation_cost(1500, 1000, 1800, 0.75), 2175)
         self.assertEqual(cutting_operation_cost(0, 1000, 1800, 0.75), 0)
 
+    def test_cutting_tariffs_include_first_thousand_sheets_for_all_machines(self):
+        self.assertEqual(cutting_operation_cost(600, 1000, 1800, 0.75), 1800)
+        self.assertEqual(cutting_operation_cost(2672, 1000, 1800, 0.75), 3054)
+        self.assertEqual(cutting_operation_cost(6515, 1000, 1800, 0.75), 5936.25)
+        self.assertEqual(cutting_operation_cost(1500, 1000, 3000, 1.0), 3500)
+
     def test_press_tirage_is_priced_per_1000_press_sheets(self):
         params = {
             "b_3550_cmyk": 1800,
@@ -138,10 +186,11 @@ class OptimizationTests(unittest.TestCase):
             special_cut=False,
             postpress="Düz Kesim",
             total_area_m2=1.0,
+            products_per_sheet=4,
         )
         self.assertEqual(costs["Baskı"], 2400)
-        self.assertEqual(costs["Kesim"], 4725)
-        self.assertEqual(costs["Bıçak"], 900)
+        self.assertEqual(costs["Kesim"], 2175)
+        self.assertEqual(costs["Bıçak"], 3600)
 
     def test_k_bobts_excess_is_based_on_print_sheets_not_order_units(self):
         params = {
