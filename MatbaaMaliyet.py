@@ -271,6 +271,14 @@ def parametreleri_yukle():
                 for key, value in default_params.items():
                     if key not in kayitli:
                         kayitli[key] = value
+                eski_tarifeler = {
+                    "b_3550_cmyk": (2400.0, 1800.0),
+                    "b_3550_pantone": (1200.0, 900.0),
+                    "b_3550_tiraj": (500.0, 400.0),
+                }
+                for key, (eski, yeni) in eski_tarifeler.items():
+                    if kayitli.get(key) == eski:
+                        kayitli[key] = yeni
                 return kayitli
         except Exception:
             return default_params.copy()
