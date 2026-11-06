@@ -11,7 +11,8 @@ from typing import Iterable
 app_source = Path(__file__).with_name("MatbaaMaliyet.py").read_text(encoding="utf-8-sig")
 app_tree = ast.parse(app_source)
 helper_names = {"Rect", "Machine", "box_blank_size", "best_box_montage",
-                "bobin_cutting_allowed", "rectangular_imposition", "score_candidate", "recommend",
+                "bobin_cutting_allowed", "rectangular_imposition", "rectangular_imposition_layout",
+                "score_candidate", "recommend",
                 "estimate_knife_cost", "tiered_operation_cost", "press_cost_from_params",
                 "cutting_operation_cost", "layout_process_costs", "sheet_fits_limits",
                 "automatic_postpress_for_product", "included_quantity_operation_cost",
@@ -27,6 +28,7 @@ best_box_montage = helper_namespace["best_box_montage"]
 bobin_cutting_allowed = helper_namespace["bobin_cutting_allowed"]
 box_blank_size = helper_namespace["box_blank_size"]
 rectangular_imposition = helper_namespace["rectangular_imposition"]
+rectangular_imposition_layout = helper_namespace["rectangular_imposition_layout"]
 recommend = helper_namespace["recommend"]
 score_candidate = helper_namespace["score_candidate"]
 estimate_knife_cost = helper_namespace["estimate_knife_cost"]
@@ -41,6 +43,10 @@ pricing_summary = helper_namespace["pricing_summary"]
 
 
 class OptimizationTests(unittest.TestCase):
+    def test_sheet_layout_reports_real_columns_and_rows(self):
+        layout = rectangular_imposition_layout(Rect(100, 200), Rect(90, 90), gap_mm=0)
+        self.assertEqual(layout, {"count": 2, "columns": 1, "rows": 2})
+
     def test_cost_markup_reports_profit_and_gross_margin(self):
         summary = pricing_summary(1000, 30)
         self.assertEqual(summary["total_profit"], 300)

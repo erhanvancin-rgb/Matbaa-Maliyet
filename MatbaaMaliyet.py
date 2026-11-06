@@ -83,7 +83,8 @@ def best_box_montage(
             blank = box_blank_size(
                 width_mm, length_mm, height_mm, style, rows, columns
             )
-            groups = rectangular_imposition(sheet, blank, gap_mm=0)
+            grid = rectangular_imposition_layout(sheet, blank, gap_mm=0)
+            groups = grid["count"]
             products = groups * rows * columns
 
             if (
@@ -98,9 +99,13 @@ def best_box_montage(
                     "product_count": products,
                     "rows": rows,
                     "columns": columns,
+                    "sheet_rows": grid["rows"] * rows,
+                    "sheet_columns": grid["columns"] * columns,
                     "blank": blank,
                 }
 
+    best["layout_rows"] = best.pop("sheet_rows", 0)
+    best["layout_columns"] = best.pop("sheet_columns", 0)
     return best
 
 
@@ -108,20 +113,28 @@ def bobin_cutting_allowed(paper_name: str, paper_kg: float) -> bool:
     return paper_name in {"Amerikan Bristol", "Krome Karton"} and paper_kg > 600.0
 
 
-def rectangular_imposition(sheet: Rect, product: Rect, gap_mm: float = 3.0) -> int:
-    """Dikdörtgen ürün için iki yönelimin ızgara verimini hesaplar."""
+def rectangular_imposition_layout(
+    sheet: Rect, product: Rect, gap_mm: float = 3.0
+) -> dict:
+    """Return the best count and its physical columns/rows on a sheet."""
     if min(sheet.width_mm, sheet.height_mm, product.width_mm, product.height_mm) <= 0:
-        return 0
+        return {"count": 0, "columns": 0, "rows": 0}
 
-    def count(w: float, h: float) -> int:
+    def layout(w: float, h: float) -> dict:
         across = int((sheet.width_mm + gap_mm) // (w + gap_mm))
         down = int((sheet.height_mm + gap_mm) // (h + gap_mm))
-        return across * down
+        return {"count": across * down, "columns": across, "rows": down}
 
-    return max(
-        count(product.width_mm, product.height_mm),
-        count(product.height_mm, product.width_mm),
-    )
+    options = [
+        layout(product.width_mm, product.height_mm),
+        layout(product.height_mm, product.width_mm),
+    ]
+    return max(options, key=lambda option: (option["count"], option["rows"]))
+
+
+def rectangular_imposition(sheet: Rect, product: Rect, gap_mm: float = 3.0) -> int:
+    """Dikdörtgen ürün için iki yönelimin ızgara verimini hesaplar."""
+    return rectangular_imposition_layout(sheet, product, gap_mm)["count"]
 
 
 def sheet_fits_limits(width_mm: float, height_mm: float, max_width_mm: float, max_height_mm: float) -> bool:
@@ -494,10 +507,13 @@ st.markdown(
     }
     [data-testid="stAlert"] {
         border-radius: 12px;
-        background: #17253a;
-        color: #e5edf8;
+        background: #17253a !important;
+        color: #e5edf8 !important;
         border: 1px solid var(--line);
     }
+    [data-testid="stAlert"] [data-testid="stMarkdownContainer"],
+    [data-testid="stAlert"] [data-testid="stMarkdownContainer"] p,
+    [data-testid="stAlert"] p { color: #e5edf8 !important; }
     [data-testid="stVerticalBlockBorderWrapper"] {
         border-color: var(--line);
         border-radius: 16px;
@@ -889,24 +905,19 @@ elif st.session_state.page == "calc":
         net_c = st.number_input("Ürün Adedi C", value=25000, min_value=1, step=100)
 
     st.markdown('<div class="section-kicker">02 · Kâğıt ve ebat</div>', unsafe_allow_html=True)
-    col_ka_head, _ = st.columns(2)
-    with col_ka_head:
-        ca_g, ca_c = st.columns(2)
-        with ca_g:
-            gramaj_a = st.number_input("Gramaj (gr/m²)", value=350, step=10, min_value=50)
-        with ca_c:
-            kagit_cinsi_a = st.selectbox(
-                "Kağıt Cinsi",
-                ["Amerikan Bristol", "Krome Karton", "Kuşe Kağıt", "1. Hamur Kağıt"],
-            )
-
-    st.markdown('<div class="section-kicker">03 · Baskı</div>', unsafe_allow_html=True)
-    col_ebat1, col_ebat2, col_ebat3, col_baski1, col_baski2 = st.columns(5)
-    with col_ebat1:
+    col_paper_and_size = st.columns(5)
+    with col_paper_and_size[0]:
+        gramaj_a = st.number_input("Gramaj (gr/m²)", value=350, step=10, min_value=50)
+    with col_paper_and_size[1]:
+        kagit_cinsi_a = st.selectbox(
+            "Kâğıt cinsi",
+            ["Amerikan Bristol", "Krome Karton", "Kuşe Kağıt", "1. Hamur Kağıt"],
+        )
+    with col_paper_and_size[2]:
         ebat_en = st.number_input("En (mm) [A]", value=100)
-    with col_ebat2:
+    with col_paper_and_size[3]:
         ebat_boy = st.number_input("Boy (mm) [B]", value=150)
-    with col_ebat3:
+    with col_paper_and_size[4]:
         ebat_yukseklik = st.number_input(
             "Yükseklik (mm) [C]",
             value=50.0 if is_kutu else 0.0,
@@ -922,35 +933,35 @@ elif st.session_state.page == "calc":
     else:
         sira_sayisi = 1
 
-    with col_baski1:
+    st.markdown('<div class="section-kicker">03 · Baskı ve son işlemler</div>', unsafe_allow_html=True)
+    col_baski_son = st.columns(6)
+    with col_baski_son[0]:
         cmyk_secim = st.selectbox(
             "Baskı CMYK",
             ["Tek Yüz", "Ön&Arka", "CMYK Baskı yok"],
         )
-    with col_baski2:
+    with col_baski_son[1]:
         pantone_secimi = st.selectbox(
             "Baskı Pantone renk",
             ["Yok", "1 renk zemin", "2 renk zemin", "1 renk lokal"],
         )
 
-    st.markdown('<div class="section-kicker">04 · Yüzey ve son işlemler</div>', unsafe_allow_html=True)
-    c_lam, c_ob1, c_ob2, c_bs = st.columns(4)
-    with c_lam:
+    with col_baski_son[2]:
         laminasyon = st.selectbox(
             "Laminasyon",
             ["Parlak Selofan", "Mat Selofan", "Yok"],
         )
-    with c_ob1:
+    with col_baski_son[3]:
         ozel_baski_1 = st.selectbox(
             "Özel Baskılar 1",
             ["Yok", "Dispresiyon Lak", "Lokal Lak", "Kabartma Lak", "Varak Yaldız"],
         )
-    with c_ob2:
+    with col_baski_son[4]:
         ozel_baski_2 = st.selectbox(
             "Özel Baskılar 2",
             ["Yok", "Dispresiyon Lak", "Lokal Lak", "Kabartma Lak", "Varak Yaldız"],
         )
-    with c_bs:
+    with col_baski_son[5]:
         otomatik_son_islem = automatic_postpress_for_product(urun_tipi)
         if otomatik_son_islem:
             baski_sonrasi = otomatik_son_islem
@@ -961,18 +972,12 @@ elif st.session_state.page == "calc":
                 ["Düz Kesim", "Özel kesim"],
             )
 
-    st.markdown('<div class="section-kicker">05 · Kesim ve özel istekler</div>', unsafe_allow_html=True)
-    kesim_makinesi = st.selectbox(
-        "Kesim makinesi tarifesi",
-        ["Kazanlı Kesim", "K. Bobts", "Bobst Kesim"],
-    )
-    st.caption("Kazanlı maksimum ebat: 50×70 cm. K. Bobts maksimum ebat: 60×80 cm. Bobst maksimum ebat: 70×100 cm.")
-
-    ozel_istekler = st.text_input(
-        "Özel İstekler",
-        "",
-        placeholder="Özel talepleri buraya yazınız...",
-    )
+    with st.expander("Teklif için özel istek ekle (isteğe bağlı)"):
+        ozel_istekler = st.text_input(
+            "Özel istekler",
+            "",
+            placeholder="Özel talepleri buraya yazınız...",
+        )
 
     st.markdown("---")
 
@@ -1027,10 +1032,11 @@ elif st.session_state.page == "calc":
             w_net = ebat_en + 3.0
             h_net = ebat_boy + 3.0
             blank = Rect(w_net, h_net)
+            grid = rectangular_imposition_layout(Rect(w_avail, h_avail), blank)
             return {
-                "count": rectangular_imposition(Rect(w_avail, h_avail), blank),
-                "rows": 1,
-                "columns": 1,
+                "count": grid["count"],
+                "rows": grid["rows"],
+                "columns": grid["columns"],
                 "blank": blank,
             }
 
@@ -1047,23 +1053,23 @@ elif st.session_state.page == "calc":
                 kutu_tipi,
                 sira_sayisi,
             )
-            grid_count = rectangular_imposition(
-                Rect(w_avail, h_avail),
-                blank,
-            )
+            grid = rectangular_imposition_layout(Rect(w_avail, h_avail), blank)
             return {
-                "count": grid_count * sira_sayisi,
-                "rows": sira_sayisi,
-                "columns": 1,
+                "count": grid["count"] * sira_sayisi,
+                "rows": grid["rows"] * sira_sayisi,
+                "columns": grid["columns"],
                 "blank": blank,
             }
 
-        return best_box_montage(
+        best = best_box_montage(
             Rect(w_avail, h_avail),
             ebat_en,
             ebat_boy,
             ebat_yuk,
         )
+        best["rows"] = best["layout_rows"]
+        best["columns"] = best["layout_columns"]
+        return best
 
     # Bobin kesim adayları 5 cm aralıklarla üretilir.
     def bobin_adaylarini_uret():
@@ -1177,6 +1183,11 @@ elif st.session_state.page == "calc":
         def adaylari_degerlendir(aday_listesi):
             nonlocal en_iyi_secim, min_maliyet
 
+            tum_makine_adaylari = (
+                (*aday, kesim_makinesi)
+                for aday in aday_listesi
+                for kesim_makinesi in ["Kazanlı Kesim", "K. Bobts", "Bobst Kesim"]
+            )
             for (
                 ana_tabaka,
                 baski_ebat_adi,
@@ -1187,7 +1198,8 @@ elif st.session_state.page == "calc":
                 makine_kodu,
                 makas,
                 bolunme_orani,
-            ) in aday_listesi:
+                kesim_makinesi,
+            ) in tum_makine_adaylari:
                 cutter_max = {
                     "Kazanlı Kesim": (500.0, 700.0),
                     "K. Bobts": (600.0, 800.0),
@@ -1296,6 +1308,7 @@ elif st.session_state.page == "calc":
                         "press_sheets": baskiya_giren_tabaka_adeti,
                         "total_cost": toplam_maliyet,
                         "makine_kodu": makine_kodu,
+                        "kesim_makinesi": kesim_makinesi,
                         "tabaka_adeti": tabaka_adeti,
                         "montaj_detay": montaj_detay,
                     }
@@ -1325,6 +1338,7 @@ elif st.session_state.page == "calc":
                         "baski_maliyeti": baski_maliyeti,
                         "toplam_uretim_maliyeti": toplam_maliyet,
                         "makine_kodu": makine_kodu,
+                        "kesim_makinesi": kesim_makinesi,
                         "kesim_maliyeti_dahil": True,
                         "geometri_dogrulama_gerekli": is_kutu,
                     }
@@ -1349,6 +1363,7 @@ elif st.session_state.page == "calc":
                             "bicak_maliyeti": bicak_maliyeti,
                             "toplam_uretim_maliyeti": toplam_maliyet,
                             "makine_kodu": makine_kodu,
+                            "kesim_makinesi": kesim_makinesi,
                             "kesim_maliyeti_dahil": True,
                             "geometri_dogrulama_gerekli": is_kutu,
                         }
@@ -1361,7 +1376,7 @@ elif st.session_state.page == "calc":
 
         if en_iyi_secim is None:
             raise ValueError(
-                f"{kesim_makinesi} sınırlarına uygun üretim planı bulunamadı."
+                "Kesim makinesi sınırlarına uygun üretim planı bulunamadı."
             )
 
         en_iyi_secim["oneriler"] = recommend(aday_sonuclari)
@@ -1436,7 +1451,7 @@ elif st.session_state.page == "calc":
             press_code=press_code,
             sheet_quantity=press_sheets,
             order_quantity=quantity,
-            cutting_machine=kesim_makinesi,
+            cutting_machine=r["kesim_makinesi"],
             cmyk_enabled=cmyk_secim != "CMYK Baskı yok",
             pantone_colors=pantone_colors,
             lamination=laminasyon,
@@ -1507,7 +1522,10 @@ elif st.session_state.page == "calc":
         "ozel_baski": ozel_baski_ozet,
         "ozel_istekler": ozel_istekler,
         "kar_oranlari": kar_oranlari,
-        "kesim_makinesi": kesim_makinesi,
+        "kesim_makineleri": {
+            plan["kod"]: plan["res"]["kesim_makinesi"]
+            for plan in teklif_alternatifleri
+        },
         "ek_giderler": ek_giderler,
         "alternatifler": teklif_alternatifleri,
     }
@@ -1616,7 +1634,7 @@ elif st.session_state.page == "calc":
                 {
                     "Parametre / Kriter": "Montaj Planı",
                     "Değer": (
-                        f"1 Tabakada {r['montaj_adedi']} Ürün; "
+                        f"1 Tabakada {r['montaj_adedi']} ürün; "
                         f"{r.get('montaj_detay', 'Dikdörtgen yerleşim')} ({urun_tipi})"
                     ),
                 },
@@ -1678,7 +1696,8 @@ elif st.session_state.page == "calc":
                 st.markdown(f"**{etiket}**")
                 st.caption(
                     f"{secim['ana_ebat']} ana tabaka · {secim['baski_ebat_str']} baskı · "
-                    f"{secim['montaj_detay']} · montajda {secim['montaj_adedi']} ürün"
+                    f"{secim['kesim_makinesi']} · {secim['montaj_detay']} · "
+                    f"montajda {secim['montaj_adedi']} ürün"
                 )
                 st.write(
                     f"Baskı/kesim: **{secim['press_sheets']:,} tabaka** · "
@@ -1733,7 +1752,8 @@ elif st.session_state.page == "calc":
 
     st.markdown("### 💰 Üretim Maliyeti ve Satış Özeti")
     st.caption(
-        f"Kesim tarifesi: {kesim_makinesi}. Bıçak hesabı kutuda "
+        "Kesim makinesi her plan için ebat uygunluğu ve tarifesine göre otomatik seçilir. "
+        "Bıçak hesabı kutuda "
         "(en×6 + boy×6)×1,20 mm; 2D özel kesimde (en×2 + boy×2) mm kabul edilerek "
         "500 TL/metre tarifesine çevrilir. Bıçak tutarı iş başına bir defa eklenir."
     )
@@ -1795,7 +1815,7 @@ elif st.session_state.page == "teklif":
         kar_oranlari = td["kar_oranlari"]
 
         st.warning(
-            "Teklif toplamına kâğıt, baskı, laminasyon, seçilen kesim ve kutu yapıştırma "
+            "Teklif toplamına kâğıt, baskı, laminasyon, plan için otomatik seçilen kesim ve kutu yapıştırma "
             "tarifeleri ile girilen mücellit/nakliye/ekstra giderler eklenmiştir. Bıçak "
             "uzunluğu tahminidir; gerçek kalıp çizimiyle doğrulayın. Tüm fiyatlar KDV hariçtir; KDV ayrıca eklenir."
         )
@@ -1858,6 +1878,7 @@ elif st.session_state.page == "teklif":
                     "Net Adet": f"{net_adet:,} adet",
                     "Kağıt Özelliği": f"{alt['gramaj']} gr {alt['kagit']}",
                     "Ana Tabaka": res["ana_ebat"],
+                    "Kesim Makinesi": res["kesim_makinesi"],
                     "Kağıt Ağırlığı": f"{res['kg_kagit']} kg",
                     "Kâr Oranı (%)": f"%{kar_orani:g}",
                     "Toplam Kâr (TL)": f"₺{fiyat_ozeti['total_profit']:,.2f}",
