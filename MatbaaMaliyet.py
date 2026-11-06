@@ -280,6 +280,16 @@ def press_cost_from_params(
     return cmyk_setup + pantone_setup + run_cost
 
 
+def automatic_postpress_for_product(product_type: str) -> str | None:
+    """Return the required finishing operation for box products."""
+    box_types = {
+        "Standart Kutu",
+        "Dip Kilitli Kutu",
+        "Dip Kilit Yapıştırmalı Kutu",
+    }
+    return "Kutu Kesim + Yapıştırma" if product_type in box_types else None
+
+
 def layout_process_costs(
     params: dict,
     press_code: str,
@@ -850,10 +860,15 @@ elif st.session_state.page == "calc":
             ["Yok", "Dispresiyon Lak", "Lokal Lak", "Kabartma Lak", "Varak Yaldız"],
         )
     with c_bs:
-        baski_sonrasi = st.selectbox(
-            "Baskı Sonrası",
-            ["Düz Kesim", "Özel kesim", "Kutu Kesim + Yapıştırma"],
-        )
+        otomatik_son_islem = automatic_postpress_for_product(urun_tipi)
+        if otomatik_son_islem:
+            baski_sonrasi = otomatik_son_islem
+            st.info(f"Otomatik işlem: **{baski_sonrasi}**")
+        else:
+            baski_sonrasi = st.selectbox(
+                "Baskı Sonrası",
+                ["Düz Kesim", "Özel kesim"],
+            )
 
     st.markdown('<div class="section-kicker">05 · Kesim ve özel istekler</div>', unsafe_allow_html=True)
     kesim_makinesi = st.selectbox(
