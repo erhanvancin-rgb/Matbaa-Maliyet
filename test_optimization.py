@@ -144,6 +144,12 @@ class OptimizationTests(unittest.TestCase):
         self.assertEqual(cutting_operation_cost(1500, 1000, 1800, 0.75), 2175)
         self.assertEqual(cutting_operation_cost(0, 1000, 1800, 0.75), 0)
 
+    def test_cutting_tariffs_include_first_thousand_sheets_for_all_machines(self):
+        self.assertEqual(cutting_operation_cost(600, 1000, 1800, 0.75), 1800)
+        self.assertEqual(cutting_operation_cost(2672, 1000, 1800, 0.75), 3054)
+        self.assertEqual(cutting_operation_cost(6515, 1000, 1800, 0.75), 5936.25)
+        self.assertEqual(cutting_operation_cost(1500, 1000, 3000, 1.0), 3500)
+
     def test_press_tirage_is_priced_per_1000_press_sheets(self):
         params = {
             "b_3550_cmyk": 1800,
@@ -180,10 +186,11 @@ class OptimizationTests(unittest.TestCase):
             special_cut=False,
             postpress="Düz Kesim",
             total_area_m2=1.0,
+            products_per_sheet=4,
         )
         self.assertEqual(costs["Baskı"], 2400)
-        self.assertEqual(costs["Kesim"], 4725)
-        self.assertEqual(costs["Bıçak"], 900)
+        self.assertEqual(costs["Kesim"], 2175)
+        self.assertEqual(costs["Bıçak"], 3600)
 
     def test_k_bobts_excess_is_based_on_print_sheets_not_order_units(self):
         params = {
