@@ -51,15 +51,15 @@ def best_box_montage(sheet: Rect, width_mm: float, length_mm: float,
                      height_mm: float, style: str = "standard",
                      max_rows: int = 12, max_columns: int = 4) -> dict:
     """Satır/sütun kombinasyonları ve iki yönelim arasında kutu verimini arar."""
-    best = {"product_count": 0, "rows": 0, "columns": 0, "blank": None}
+    best = {"count": 0, "product_count": 0, "rows": 0, "columns": 0, "blank": None}
     for rows in range(1, max_rows + 1):
         for columns in range(1, max_columns + 1):
             blank = box_blank_size(width_mm, length_mm, height_mm, style, rows, columns)
             groups = rectangular_imposition(sheet, blank, gap_mm=0)
             products = groups * rows * columns
-            if (products > best["product_count"] or
+            if (products > best["count"] or
                     (products == best["product_count"] and rows * columns > best["rows"] * best["columns"])):
-                best = {"product_count": products, "rows": rows,
+                best = {"count": products, "product_count": products, "rows": rows,
                         "columns": columns, "blank": blank}
     return best
 
