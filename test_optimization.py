@@ -12,7 +12,8 @@ app_source = Path(__file__).with_name("MatbaaMaliyet.py").read_text(encoding="ut
 app_tree = ast.parse(app_source)
 helper_names = {"Rect", "Machine", "box_blank_size", "best_box_montage",
                 "bobin_cutting_allowed", "rectangular_imposition", "score_candidate", "recommend",
-                "estimate_knife_cost", "tiered_operation_cost", "press_cost_from_params"}
+                "estimate_knife_cost", "tiered_operation_cost", "press_cost_from_params",
+                "sheet_fits_limits"}
 helper_nodes = [node for node in app_tree.body
                 if getattr(node, "name", None) in helper_names]
 helper_namespace = {"__name__": "matbaa_helpers", "dataclass": dataclass,
@@ -29,6 +30,7 @@ score_candidate = helper_namespace["score_candidate"]
 estimate_knife_cost = helper_namespace["estimate_knife_cost"]
 tiered_operation_cost = helper_namespace["tiered_operation_cost"]
 press_cost_from_params = helper_namespace["press_cost_from_params"]
+sheet_fits_limits = helper_namespace["sheet_fits_limits"]
 
 
 class OptimizationTests(unittest.TestCase):
@@ -101,6 +103,12 @@ class OptimizationTests(unittest.TestCase):
         }
         self.assertEqual(press_cost_from_params(params, "3550", 1500, True, 2), 4200)
         self.assertEqual(press_cost_from_params(params, "3550", 3000, False, 0), 0)
+
+    def test_cutting_machine_size_limits_allow_rotation(self):
+        self.assertTrue(sheet_fits_limits(500, 700, 500, 700))
+        self.assertTrue(sheet_fits_limits(700, 500, 500, 700))
+        self.assertFalse(sheet_fits_limits(700, 1000, 500, 700))
+        self.assertTrue(sheet_fits_limits(700, 1000, 700, 1000))
 
 
 if __name__ == "__main__":

@@ -31,7 +31,7 @@
     "pedal": 2500.0,
     "pedal_tiraj": 1.0,
     "bobst": 3000.0,
-    "bobst_tiraj": 1.5,
+    "bobst_tiraj": 1.0,
     "omega_tek": 2000.0,
     "omega_tek_tiraj": 0.2,
     "omega_dip": 2500.0,
