@@ -563,6 +563,97 @@ st.markdown(
         border-radius: 12px;
         background: rgba(17, 28, 46, .78);
     }
+    /* --- KOYU TEMA UYUMLULUK DUZELTMELERI --- */
+    /* Streamlit bilgi/uyari/hata bantlari: tum ic katmanlari da koyu tut. */
+    [data-testid="stAlert"],
+    [data-testid="stAlert"] > div,
+    [data-testid="stAlert"] [data-testid="stMarkdownContainer"],
+    [data-testid="stAlert"] [data-testid="stMarkdownContainer"] > div {
+        background: rgba(23, 37, 58, .92) !important;
+        color: #e5edf8 !important;
+        border-color: #354a65 !important;
+        box-shadow: none !important;
+    }
+    [data-testid="stAlert"] p,
+    [data-testid="stAlert"] span,
+    [data-testid="stAlert"] label { color: #e5edf8 !important; }
+    [data-testid="stAlert"] svg { fill: currentColor; }
+
+    /* Selectbox kapali alan, secili deger, ok ve tum BaseWeb alt elemanlari. */
+    [data-testid="stSelectbox"] [data-baseweb="select"],
+    [data-testid="stSelectbox"] [data-baseweb="select"] > div,
+    [data-testid="stSelectbox"] [data-baseweb="select"] > div > div,
+    [data-testid="stSelectbox"] [data-baseweb="select"] input,
+    [data-testid="stSelectbox"] [data-baseweb="select"] [role="combobox"] {
+        background-color: #0e1929 !important;
+        color: #edf4ff !important;
+        border-color: #435873 !important;
+    }
+    [data-testid="stSelectbox"] [data-baseweb="select"] svg,
+    [data-testid="stSelectbox"] [data-baseweb="select"] [data-testid="stCaretDown"] {
+        color: #dbe7f5 !important;
+        fill: #dbe7f5 !important;
+    }
+    /* Acilan secenek listesi bazi Streamlit surumlerinde portal olarak cizilir. */
+    [data-baseweb="popover"],
+    [data-baseweb="popover"] > div,
+    [data-baseweb="popover"] [role="listbox"],
+    [data-baseweb="menu"],
+    [role="listbox"],
+    [role="option"] {
+        background-color: #17253a !important;
+        color: #edf4ff !important;
+        border-color: #354a65 !important;
+    }
+    [data-baseweb="popover"] [role="option"]:hover,
+    [role="option"][aria-selected="true"] {
+        background-color: #263b56 !important;
+        color: #ffffff !important;
+    }
+    [data-baseweb="popover"] [role="option"] *,
+    [role="option"] * { color: inherit !important; }
+
+    /* Metin, sayi ve tarih girisleri; beyaz tarayici varsayilanlarini bastir. */
+    [data-testid="stTextInput"] input,
+    [data-testid="stNumberInput"] input,
+    [data-testid="stTextArea"] textarea,
+    [data-testid="stDateInput"] input,
+    [data-testid="stTimeInput"] input {
+        background-color: #0e1929 !important;
+        color: #edf4ff !important;
+        border: 1px solid #435873 !important;
+        -webkit-text-fill-color: #edf4ff !important;
+        caret-color: #2dd4bf !important;
+    }
+    [data-testid="stTextInput"] input::placeholder,
+    [data-testid="stNumberInput"] input::placeholder,
+    [data-testid="stTextArea"] textarea::placeholder {
+        color: #91a4bd !important;
+        -webkit-text-fill-color: #91a4bd !important;
+    }
+    [data-testid="stNumberInput"] button {
+        background: #1b2a40 !important;
+        color: #edf4ff !important;
+        border-color: #435873 !important;
+    }
+    /* Radio, checkbox ve multiselect secim yuzeyleri. */
+    [data-testid="stRadio"] label,
+    [data-testid="stCheckbox"] label,
+    [data-testid="stMultiSelect"] [data-baseweb="select"] > div {
+        color: #dbe7f5 !important;
+    }
+    [data-testid="stMultiSelect"] [data-baseweb="select"] > div,
+    [data-testid="stMultiSelect"] [data-baseweb="tag"] {
+        background-color: #0e1929 !important;
+        color: #edf4ff !important;
+        border-color: #435873 !important;
+    }
+    /* Tarayicinin acik renkli native select/option gostermesini engelle. */
+    select, option {
+        color-scheme: dark !important;
+        background-color: #0e1929 !important;
+        color: #edf4ff !important;
+    }
     .app-hero {
         padding: 1.35rem 1.6rem;
         margin-bottom: 1.1rem;
